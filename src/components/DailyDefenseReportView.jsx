@@ -61,8 +61,15 @@ ${selectedDate} 당일 야드 피킹율이 ${dateInfo.yardPickingRate}%로 기�
       </div>
 
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '14px', fontSize: '0.8rem', color: 'var(--text-muted)' }}>
-        <span>작성기관: NovaTech RWCS Analytics Team | 대상 고객사: 한화비전</span>
-        <span>보고서 자동 생성 일시: 2026-07-20 23:00 (공식 인쇄 검증 필)</span>
+        <span>작성기관: Novatek RWCS Team | 대상 고객사: 한화비전</span>
+        <img 
+          src="/images/Novatek_logo.png" 
+          alt="Novatek 로고" 
+          style={{ 
+            height: '34px', 
+            objectFit: 'contain'
+          }} 
+        />
       </div>
     </section>
   );

@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
 import { AlertTriangle, ChevronRight, X, ShieldAlert } from 'lucide-react';
 
-export default function ExceptionAlertBanner({ invalidMissions }) {
+export default function ExceptionAlertBanner({ invalidMissions = [], startDate, endDate }) {
   const [showModal, setShowModal] = useState(false);
 
   if (!invalidMissions || invalidMissions.length === 0) return null;
+
+  const dateRangeText = startDate && endDate ? ` (조회 기간: ${startDate} ~ ${endDate})` : '';
 
   return (
     <>
@@ -12,8 +14,9 @@ export default function ExceptionAlertBanner({ invalidMissions }) {
         <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
           <AlertTriangle size={20} />
           <div>
-            <strong>RWCS 미션 오설정 예외 경고:</strong> 진입 불가(Blocked == TRUE) 랙을 대상(From/To)으로 발주된 비정상 미션 
+            <strong>RWCS 미션 오설정 예외 경고:</strong> 선택 조회 기간 내 진입 불가(Blocked == TRUE) 랙을 대상(From/To)으로 발주된 비정상 미션 
             <strong style={{ color: '#fff', marginLeft: '4px', textDecoration: 'underline' }}>{invalidMissions.length}건</strong>이 탐지되었습니다.
+            <span style={{ fontSize: '0.8rem', color: 'rgba(255,255,255,0.7)', marginLeft: '6px' }}>{dateRangeText}</span>
           </div>
         </div>
 

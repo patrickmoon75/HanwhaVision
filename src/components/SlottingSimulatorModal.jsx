@@ -70,7 +70,12 @@ export default function SlottingSimulatorModal({ isOpen, onClose, dateInfo }) {
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                   <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
                   <YAxis domain={[0, 100]} stroke="var(--text-secondary)" tick={{ fontSize: 11 }} unit="%" />
-                  <Tooltip formatter={(v) => `${v}%`} />
+                  <Tooltip 
+                    formatter={(v) => `${v}%`} 
+                    contentStyle={{ backgroundColor: '#111827', borderColor: 'rgba(255, 255, 255, 0.15)', borderRadius: '8px', color: '#f1f5f9' }}
+                    itemStyle={{ color: '#00e676' }}
+                    labelStyle={{ color: '#f1f5f9', fontWeight: 600 }}
+                  />
                   <Bar dataKey="pickingRate" name="야드 피킹율 (%)" fill="url(#simGrad)" radius={[8, 8, 0, 0]} />
                   <defs>
                     <linearGradient id="simGrad" x1="0" y1="0" x2="0" y2="1">

@@ -12,11 +12,11 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
   ];
 
   const levelBarData = [
-    { level: '1단 (저단)', count: dateInfo.levelCounts[1] || 2 },
-    { level: '2단 (저단)', count: dateInfo.levelCounts[2] || 4 },
-    { level: '3단 (저단)', count: dateInfo.levelCounts[3] || 7 },
-    { level: '4단 (고단)', count: dateInfo.levelCounts[4] || 28 },
-    { level: '5단 (고단)', count: dateInfo.levelCounts[5] || 45 }
+    { level: '1단 (저단)', count: dateInfo.levelCounts[1] ?? 0 },
+    { level: '2단 (저단)', count: dateInfo.levelCounts[2] ?? 0 },
+    { level: '3단 (저단)', count: dateInfo.levelCounts[3] ?? 0 },
+    { level: '4단 (고단)', count: dateInfo.levelCounts[4] ?? 0 },
+    { level: '5단 (고단)', count: dateInfo.levelCounts[5] ?? 0 }
   ];
 
   return (
@@ -44,7 +44,12 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
                   <Cell key={`cell-${index}`} fill={entry.color} />
                 ))}
               </Pie>
-              <Tooltip formatter={(val) => `${val}%`} />
+              <Tooltip 
+                formatter={(val) => `${val}%`} 
+                contentStyle={{ backgroundColor: '#111827', borderColor: 'rgba(255, 255, 255, 0.15)', borderRadius: '8px', color: '#f1f5f9' }}
+                itemStyle={{ color: '#00f2fe' }}
+                labelStyle={{ color: '#f1f5f9', fontWeight: 600 }}
+              />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -67,9 +72,39 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
 
       {/* 2. Bar Chart: 랙 단수별 Soft Reset 빈도 */}
       <div className="glass-card">
-        <div className="section-title" style={{ fontSize: '1rem', marginBottom: '12px' }}>
+        <div className="section-title" style={{ fontSize: '1rem', marginBottom: '10px' }}>
           <AlertOctagon color="var(--accent-amber)" size={20} />
           <span>단수별 Soft Reset 빈도 (고단 랙 품질 문제)</span>
+        </div>
+
+        {/* 미션 상태별 예외 건수 키 : 값 표시 */}
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(2, 1fr)',
+          gap: '6px 12px',
+          background: 'rgba(0, 0, 0, 0.3)',
+          padding: '8px 12px',
+          borderRadius: '8px',
+          border: '1px solid var(--border-color)',
+          marginBottom: '10px',
+          fontSize: '0.8rem'
+        }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Aborted :</span>
+            <strong style={{ color: '#ff0844', fontWeight: 700 }}>{dateInfo.abortedCount ?? dateInfo.totalAbortedMissions ?? 0}건</strong>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Canceled :</span>
+            <strong style={{ color: '#ffb199', fontWeight: 700 }}>{dateInfo.canceledCount ?? 0}건</strong>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Deleted :</span>
+            <strong style={{ color: '#00f2fe', fontWeight: 700 }}>{dateInfo.deletedCount ?? 0}건</strong>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ color: 'var(--text-secondary)' }}>Soft Reset :</span>
+            <strong style={{ color: '#ff4b72', fontWeight: 700 }}>{dateInfo.softResetCount ?? 0}건</strong>
+          </div>
         </div>
 
         <div style={{ height: 210, width: '100%' }}>
@@ -78,7 +113,11 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
               <XAxis dataKey="level" tick={{ fontSize: 11, fill: 'var(--text-secondary)' }} />
               <YAxis stroke="var(--text-secondary)" tick={{ fontSize: 11 }} />
-              <Tooltip />
+              <Tooltip 
+                contentStyle={{ backgroundColor: '#111827', borderColor: 'rgba(255, 255, 255, 0.15)', borderRadius: '8px', color: '#f1f5f9' }}
+                itemStyle={{ color: '#ffb199' }}
+                labelStyle={{ color: '#f1f5f9', fontWeight: 600 }}
+              />
               <Bar dataKey="count" name="Soft Reset 건수" fill="url(#barGradient)" radius={[6, 6, 0, 0]} />
               <defs>
                 <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
@@ -120,7 +159,7 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
             <span>실시간 복구 제어(Fallback) 입증</span>
           </div>
           <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: 1.5 }}>
-            에러(Aborted) 발생 시 RWCS가 차선순위 미션을 자동 배치하여 밤새 야드를 상시 99% 이상 만재 상태로 유지했습니다. 피킹율 하락은 가동률 부실이 아닙니다.
+            에러(Aborted) 발생 시 RWCS가 차선순위 미션을 자동 배치하여 밤새 야드를 상시 <strong style={{ color: 'var(--accent-green)' }}>{dateInfo.yardOccupancyRate}%</strong> 수준의 만재 상태로 유지했습니다. 피킹율 하락은 가동률 부실이 아닙니다.
           </p>
         </div>
       </div>

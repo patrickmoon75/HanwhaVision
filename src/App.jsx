@@ -14,6 +14,8 @@ export default function App() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState('2026-06-29');
+  const [startDate, setStartDate] = useState('2026-06-01');
+  const [endDate, setEndDate] = useState('2026-07-09');
   const [isSimulatorOpen, setIsSimulatorOpen] = useState(false);
   const [dragActive, setDragActive] = useState(false);
 
@@ -22,10 +24,10 @@ export default function App() {
       try {
         const result = await loadAndProcessData();
         setData(result);
-        if (result.dates && result.dates.includes('2026-06-29')) {
-          setSelectedDate('2026-06-29');
-        } else if (result.dates && result.dates.length > 0) {
-          setSelectedDate(result.dates[0]);
+        if (result.dates && result.dates.length > 0) {
+          setSelectedDate(result.dates.includes('2026-06-29') ? '2026-06-29' : result.dates[0]);
+          setStartDate(result.dates[0]);
+          setEndDate(result.dates[result.dates.length - 1]);
         }
       } catch (err) {
         console.error("Default fetch failed, listening for manual file uploads:", err);
@@ -73,6 +75,8 @@ export default function App() {
       setData(result);
       if (result.dates && result.dates.length > 0) {
         setSelectedDate(result.dates[0]);
+        setStartDate(result.dates[0]);
+        setEndDate(result.dates[result.dates.length - 1]);
       }
     } catch (err) {
       alert("파일 파싱 중 오류가 발생했습니다: " + err.message);
@@ -119,6 +123,14 @@ export default function App() {
 
   const currentDateInfo = data.dailyAnalytics[selectedDate] || {};
 
+  // Filter Invalid Missions by Selected Date Range (startDate ~ endDate)
+  const filteredInvalidMissions = (data.invalidMissions || []).filter(m => {
+    if (!m.date) return true;
+    const start = startDate || (data.dates?.[0]);
+    const end = endDate || (data.dates?.[data.dates?.length - 1]);
+    return m.date >= start && m.date <= end;
+  });
+
   return (
     <div
       className="dashboard-container"
@@ -135,8 +147,12 @@ export default function App() {
         onOpenSimulator={() => setIsSimulatorOpen(true)}
       />
 
-      {/* 2. RWCS Exception Alert Banner */}
-      <ExceptionAlertBanner invalidMissions={data.invalidMissions} />
+      {/* 2. RWCS Exception Alert Banner (Filtered by Date Range) */}
+      <ExceptionAlertBanner 
+        invalidMissions={filteredInvalidMissions} 
+        startDate={startDate}
+        endDate={endDate}
+      />
 
       {/* 3. Top Trend View */}
       <PickingTrendView
@@ -144,6 +160,12 @@ export default function App() {
         dailyAnalytics={data.dailyAnalytics}
         selectedDate={selectedDate}
         onSelectDate={setSelectedDate}
+        startDate={startDate}
+        endDate={endDate}
+        onRangeChange={(s, e) => {
+          setStartDate(s);
+          setEndDate(e);
+        }}
       />
 
       {/* 4. Middle Root Cause Isolation View */}

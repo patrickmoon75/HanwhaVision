@@ -8,9 +8,20 @@ export default function HeaderMasterKPI({ masterKPI, selectedDate, dates, onSele
     <header className="header-bar glass-card">
       <div className="header-top">
         <div className="brand-section">
-          <div className="brand-badge">RWCS-AGS</div>
+          <img 
+            src="/images/Hanwha_logo.jpg" 
+            alt="한화비전 로고" 
+            style={{ 
+              height: '42px', 
+              borderRadius: '6px', 
+              objectFit: 'contain',
+              background: '#ffffff',
+              padding: '3px 8px',
+              boxShadow: '0 2px 8px rgba(0,0,0,0.2)'
+            }} 
+          />
           <div>
-            <h1 className="brand-title">RWCS Analytics & Anti-Gravity Simulator</h1>
+            <h1 className="brand-title">RWCS Analytics & Simulator</h1>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
               한화비전 대고객 방어용 운영 분석 및 물리 인프라 제약 격리(Isolation) 시스템
             </p>

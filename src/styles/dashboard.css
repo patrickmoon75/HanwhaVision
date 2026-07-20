@@ -343,3 +343,22 @@ h1, h2, h3, h4, .brand-title {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* Recharts Tooltip Custom Dark Theme */
+.recharts-default-tooltip {
+  background-color: #111827 !important;
+  border: 1px solid rgba(255, 255, 255, 0.15) !important;
+  border-radius: 8px !important;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5) !important;
+  color: #f1f5f9 !important;
+}
+
+.recharts-tooltip-label {
+  color: #f1f5f9 !important;
+  font-weight: 600 !important;
+}
+
+.recharts-tooltip-item {
+  color: #00f2fe !important;
+}
+
