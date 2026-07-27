@@ -29,13 +29,15 @@ export default function PickingTrendView({
     if (onRangeChange) onRangeChange(startDate, val);
   };
   
-  // (A)~(D) 항목별 보이거나 숨김 토글 상태 (기본값: 모두 보기)
+  // (A)~(E) 항목별 보이거나 숨김 토글 상태 (기본값: 모두 미선택하여 차트를 깔끔하게 표시)
   const [visibleMetrics, setVisibleMetrics] = useState({
-    A: true,
-    B: true,
-    C: true,
-    D: true
+    A: false,
+    B: false,
+    C: false,
+    D: false,
+    E: false
   });
+  const [hoveredLine, setHoveredLine] = useState(null);
 
   const toggleMetric = (key) => {
     setVisibleMetrics(prev => ({ ...prev, [key]: !prev[key] }));
@@ -58,21 +60,34 @@ export default function PickingTrendView({
 
   const chartData = filteredDates.map(d => {
     const info = dailyAnalytics[d] || {};
+    const pickOrderCount = info.pickOrderCount || 0;
     const totalQty = info.totalPickQty || 0;
     const yardQty = info.yardPickQty || 0;
-    const nonYardQty = info.nonYardPickQty ?? Math.max(0, totalQty - yardQty);
-    const yardRate = info.yardPickingRate || 0;
-    const nonYardRate = info.nonYardPickingRate ?? (totalQty > 0 ? ((nonYardQty / totalQty) * 100).toFixed(2) : '0.00');
+    const blockedQty = info.blockedRackPickQty || 0;
+    const availQty = info.availRackPickQty || 0;
+    
+    // 피킹오더 건수가 0이면 야드 피킹율을 null로 설정하여 차트에서 0%로 내려가지 않고 끊기도록 처리
+    const hasPickOrders = pickOrderCount > 0;
+    const yardRate = hasPickOrders ? Number(info.yardPickingRate || 0) : null;
+    const blockedRate = hasPickOrders ? Number(info.blockedPickRate || 0) : null;
+    const availRate = hasPickOrders ? Number(info.availPickRate || 0) : null;
 
     return {
       date: d.slice(5), // '06-01'
       fullDate: d,
-      pickingRate: yardRate,
-      totalQty,
-      yardQty,
-      nonYardQty,
-      nonYardRate,
-      pickOrderCount: info.pickOrderCount || 0,
+      hasPickOrders,
+      pickingRate: yardRate, // (C) 야드 피킹율 (%)
+      totalQty,              // (B) 총출고량
+      yardQty,               // (C) 야드에서 출고량
+      blockedQty,            // (D) 접근불가 랙 출고량
+      blockedRate,           // (D) 접근불가 비율 (%)
+      availQty,              // (E) 접근가능 랙 출고량
+      availRate,             // (E) 접근가능 비율 (%)
+      pickOrderCount,        // (A) 피킹오더수 (Unique PickTaskId)
+      completedCount: info.completedCount || 0,
+      abortedCount: info.abortedCount || 0,
+      canceledCount: info.canceledCount || 0,
+      totalMissions: info.dayMissions?.length || 0,
       isSelected: d === selectedDate
     };
   });
@@ -87,6 +102,35 @@ export default function PickingTrendView({
   const CustomTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
+      
+      if (hoveredLine === 'completedCount') {
+        return (
+          <div style={{
+            background: 'rgba(17, 24, 39, 0.95)',
+            border: '1px solid #10b981',
+            borderRadius: '10px',
+            padding: '12px 16px',
+            boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
+            color: '#fff'
+          }}>
+            <p style={{ fontWeight: 700, color: '#10b981' }}>{data.fullDate} (지게차 미션)</p>
+            <p style={{ fontSize: '0.9rem', marginTop: '4px' }}>
+              총 생성 미션 수: <strong style={{ color: '#10b981', fontSize: '1.1rem' }}>{data.totalMissions}건</strong>
+            </p>
+            <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
+              완료 미션 수: <strong style={{ color: '#10b981' }}>{data.completedCount}건</strong><br />
+              취소 미션 수: <strong style={{ color: '#ffb199' }}>{data.canceledCount}건</strong><br />
+              중단 미션 수: <strong style={{ color: '#ff0844' }}>{data.abortedCount}건</strong>
+            </p>
+            <p style={{ fontSize: '0.75rem', color: 'var(--accent-rose)', marginTop: '6px' }}>
+              💡 클릭 시 해당 일자 상세 원인 진단으로 전환
+            </p>
+          </div>
+        );
+      }
+
+      const hasOrders = data.hasPickOrders;
+
       return (
         <div style={{
           background: 'rgba(17, 24, 39, 0.95)',
@@ -96,15 +140,29 @@ export default function PickingTrendView({
           boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
           color: '#fff'
         }}>
-          <p style={{ fontWeight: 700, color: 'var(--accent-cyan)' }}>{data.fullDate}</p>
+          <p style={{ fontWeight: 700, color: 'var(--accent-cyan)' }}>{data.fullDate} (피킹 효율)</p>
           <p style={{ fontSize: '0.9rem', marginTop: '4px' }}>
-            야드 피킹율: <strong style={{ color: '#00f2fe', fontSize: '1.1rem' }}>{data.pickingRate}%</strong>
+            야드 피킹율:{' '}
+            {hasOrders ? (
+              <strong style={{ color: '#00f2fe', fontSize: '1.1rem' }}>{data.pickingRate}%</strong>
+            ) : (
+              <strong style={{ color: '#94a3b8', fontSize: '0.95rem' }}>피킹오더 데이터 없음</strong>
+            )}
           </p>
           <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginTop: '4px' }}>
             (A) 피킹오더수: <strong>{data.pickOrderCount}건</strong><br />
             (B) 총출고량: <strong>{data.totalQty.toLocaleString()} EA</strong><br />
-            (C) 접근불가 랙 출고량: <strong style={{ color: '#ffb199' }}>{data.nonYardQty.toLocaleString()} EA ({data.nonYardRate}%)</strong><br />
-            (D) 접근가능 랙 출고량: <strong style={{ color: '#00e676' }}>{data.yardQty.toLocaleString()} EA ({data.pickingRate}%)</strong>
+            {hasOrders ? (
+              <>
+                (C) 야드에서 출고량: <strong style={{ color: '#00f2fe' }}>{data.yardQty.toLocaleString()} EA ({data.pickingRate}%)</strong><br />
+                (D) 접근불가 랙 출고량: <strong style={{ color: '#ffb199' }}>{data.blockedQty.toLocaleString()} EA ({data.blockedRate}%)</strong><br />
+                (E) 접근가능 랙 출고량: <strong style={{ color: '#00e676' }}>{data.availQty.toLocaleString()} EA ({data.availRate}%)</strong>
+              </>
+            ) : (
+              <span style={{ color: '#94a3b8', display: 'inline-block', margin: '4px 0' }}>
+                ℹ️ 해당 일자는 발생된 피킹오더 데이터가 없습니다
+              </span>
+            )}
           </p>
           <p style={{ fontSize: '0.75rem', color: 'var(--accent-rose)', marginTop: '6px' }}>
             💡 클릭 시 해당 일자 상세 원인 진단으로 전환
@@ -135,6 +193,26 @@ export default function PickingTrendView({
     );
   };
 
+  const CustomMissionLabel = (props) => {
+    const { x, y, value, index } = props;
+    const itemData = chartData[index];
+    if (!itemData || value === undefined || value === null) return null;
+    const isSel = itemData.fullDate === selectedDate;
+
+    return (
+      <text
+        x={x}
+        y={y + 16}
+        fill={isSel ? '#34d399' : '#10b981'}
+        fontSize={isSel ? '10.5px' : '9px'}
+        fontWeight={isSel ? '800' : '600'}
+        textAnchor="middle"
+      >
+        {value}건
+      </text>
+    );
+  };
+
   const CustomSubLabel = (props) => {
     const { x, y, index } = props;
     const itemData = chartData[index];
@@ -145,8 +223,9 @@ export default function PickingTrendView({
     const items = [];
     if (visibleMetrics.A) items.push({ key: 'A', text: `(A)${itemData.pickOrderCount}건`, fill: mainColor, size: '8.5px' });
     if (visibleMetrics.B) items.push({ key: 'B', text: `(B)${itemData.totalQty.toLocaleString()}`, fill: mainColor, size: '8.5px' });
-    if (visibleMetrics.C) items.push({ key: 'C', text: `(C)${itemData.nonYardQty.toLocaleString()}(${itemData.nonYardRate}%)`, fill: '#ffb199', size: '8px' });
-    if (visibleMetrics.D) items.push({ key: 'D', text: `(D)${itemData.yardQty.toLocaleString()}(${itemData.pickingRate}%)`, fill: '#00e676', size: '8px' });
+    if (visibleMetrics.C && itemData.hasPickOrders) items.push({ key: 'C', text: `(C)야드:${itemData.yardQty.toLocaleString()}(${itemData.pickingRate}%)`, fill: '#00f2fe', size: '8px' });
+    if (visibleMetrics.D && itemData.hasPickOrders) items.push({ key: 'D', text: `(D)접근불가:${itemData.blockedQty.toLocaleString()}(${itemData.blockedRate}%)`, fill: '#ffb199', size: '8px' });
+    if (visibleMetrics.E && itemData.hasPickOrders) items.push({ key: 'E', text: `(E)접근가능:${itemData.availQty.toLocaleString()}(${itemData.availRate}%)`, fill: '#00e676', size: '8px' });
 
     if (items.length === 0) return null;
 
@@ -174,10 +253,9 @@ export default function PickingTrendView({
       <div className="section-header" style={{ flexWrap: 'wrap', gap: '12px' }}>
         <div className="section-title">
           <TrendingDown color="var(--accent-cyan)" size={22} />
-          <span>일자별 야드 피킹율 추이 (Yard Picking Rate Trend)</span>
+          <span>일자별 야드 미션/피킹율 추이</span>
         </div>
 
-        {/* Date Range Selector & Period Average KPI Badge */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
           <div style={{
             display: 'flex',
@@ -262,16 +340,25 @@ export default function PickingTrendView({
         <ResponsiveContainer width="100%" height="100%">
           <LineChart 
             data={chartData} 
-            margin={{ top: 22, right: 20, left: 0, bottom: activeCount * 12 }}
+            margin={{ top: 22, right: 50, left: 0, bottom: activeCount * 12 }}
             onClick={(e) => {
               if (e && e.activePayload && e.activePayload[0]) {
                 onSelectDate(e.activePayload[0].payload.fullDate);
               }
             }}
+            onMouseLeave={() => setHoveredLine(null)}
           >
             <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
             <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 12 }} />
             <YAxis domain={[0, 100]} stroke="var(--text-secondary)" tick={{ fontSize: 12 }} unit="%" />
+            <YAxis 
+              yAxisId="right" 
+              orientation="right" 
+              stroke="#10b981" 
+              tick={{ fontSize: 12 }} 
+              domain={[0, 'auto']} 
+              unit="건"
+            />
             <Tooltip content={<CustomTooltip />} />
             <ReferenceLine 
               y={Number(periodAvgRate)} 
@@ -290,10 +377,13 @@ export default function PickingTrendView({
             <Line
               type="monotone"
               dataKey="pickingRate"
+              connectNulls={true}
               stroke="url(#lineGradient)"
               strokeWidth={3}
+              onMouseEnter={() => setHoveredLine('pickingRate')}
               dot={(props) => {
                 const { cx, cy, payload } = props;
+                if (!payload || payload.pickingRate === null || cx === undefined || cy === undefined) return null;
                 const isSel = payload.fullDate === selectedDate;
                 const isDrop = payload.fullDate === '2026-06-29';
                 return (
@@ -306,13 +396,52 @@ export default function PickingTrendView({
                     stroke={isSel ? '#ffffff' : '#000000'}
                     strokeWidth={isSel ? 3 : 1}
                     style={{ cursor: 'pointer' }}
+                    onMouseEnter={(e) => {
+                      e.stopPropagation();
+                      setHoveredLine('pickingRate');
+                    }}
                   />
                 );
               }}
-              activeDot={{ r: 9, fill: '#00f2fe' }}
+              activeDot={(props) => {
+                const { payload } = props;
+                if (!payload || payload.pickingRate === null) return null;
+                return <circle {...props} r={9} fill="#00f2fe" />;
+              }}
             >
               <LabelList content={<CustomLabel />} />
               <LabelList content={<CustomSubLabel />} />
+            </Line>
+            <Line
+              yAxisId="right"
+              type="monotone"
+              dataKey="completedCount"
+              stroke="#10b981"
+              strokeWidth={2.5}
+              onMouseEnter={() => setHoveredLine('completedCount')}
+              dot={(props) => {
+                const { cx, cy, payload } = props;
+                const isSel = payload.fullDate === selectedDate;
+                return (
+                  <circle
+                    key={`comp-${payload.fullDate}`}
+                    cx={cx}
+                    cy={cy}
+                    r={isSel ? 6 : 4}
+                    fill="#10b981"
+                    stroke={isSel ? '#ffffff' : '#000000'}
+                    strokeWidth={isSel ? 2 : 1}
+                    style={{ cursor: 'pointer' }}
+                    onMouseEnter={(e) => {
+                      e.stopPropagation();
+                      setHoveredLine('completedCount');
+                    }}
+                  />
+                );
+              }}
+              activeDot={{ r: 8, fill: '#10b981' }}
+            >
+              <LabelList content={<CustomMissionLabel />} />
             </Line>
             <defs>
               <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
@@ -325,24 +454,11 @@ export default function PickingTrendView({
         </ResponsiveContainer>
       </div>
 
-      {/* 하단 피킹율 산식 정보 및 (A)~(D) 항목 체크박스 범례 */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginTop: '16px',
-        flexWrap: 'wrap',
-        gap: '12px'
-      }}>
-        <div style={{ display: 'flex', gap: '10px', background: 'rgba(0,0,0,0.2)', padding: '10px 14px', borderRadius: '8px', fontSize: '0.8rem', color: 'var(--text-secondary)', flex: 1 }}>
-          <Info size={16} color="var(--accent-blue)" style={{ flexShrink: 0, marginTop: '2px' }} />
-          <span>
-            <strong>피킹율 산식:</strong> (야드 구역 처리 오더 수량 / 전체 피킹 오더 수량) × 100%. 
-            선택된 분석일: <strong style={{ color: '#fff' }}>{selectedDate}</strong> (해당일 피킹율: <strong style={{ color: 'var(--accent-cyan)' }}>{dailyAnalytics[selectedDate]?.yardPickingRate}%</strong>)
-          </span>
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '8px' }}>
+        <div style={{ fontSize: '0.81rem', color: 'var(--text-secondary)', background: 'rgba(0,0,0,0.25)', padding: '8px 12px', borderRadius: '8px', border: '1px solid var(--border-color)' }}>
+          <span>ℹ️ <strong>피킹율 산식</strong>: (야드 구역 처리 오더 수량 / 전체 피킹 오더 수량) × 100%. 선택된 분석일: <strong>{selectedDate}</strong> (해당일 피킹율: <strong>{(dailyAnalytics[selectedDate]?.totalPickQty > 0) ? `${dailyAnalytics[selectedDate]?.yardPickingRate}%` : '피킹오더 없음'}</strong>)</span>
         </div>
 
-        {/* (A)~(D) 항목 체크박스 범례 박스 */}
         <div style={{
           background: 'rgba(17, 24, 39, 0.95)',
           border: '1px solid var(--border-color)',
@@ -389,10 +505,10 @@ export default function PickingTrendView({
                 type="checkbox"
                 checked={visibleMetrics.C}
                 onChange={() => toggleMetric('C')}
-                style={{ accentColor: '#ffb199', cursor: 'pointer' }}
+                style={{ accentColor: '#00f2fe', cursor: 'pointer' }}
               />
-              <span style={{ color: visibleMetrics.C ? '#ffb199' : 'var(--text-secondary)', fontWeight: visibleMetrics.C ? 700 : 400 }}>
-                <strong>(C)</strong> 접근불가 랙 출고량(비율)
+              <span style={{ color: visibleMetrics.C ? '#00f2fe' : 'var(--text-secondary)', fontWeight: visibleMetrics.C ? 700 : 400 }}>
+                <strong>(C)</strong> 야드에서 출고량(비율)
               </span>
             </label>
 
@@ -401,10 +517,22 @@ export default function PickingTrendView({
                 type="checkbox"
                 checked={visibleMetrics.D}
                 onChange={() => toggleMetric('D')}
+                style={{ accentColor: '#ffb199', cursor: 'pointer' }}
+              />
+              <span style={{ color: visibleMetrics.D ? '#ffb199' : 'var(--text-secondary)', fontWeight: visibleMetrics.D ? 700 : 400 }}>
+                <strong>(D)</strong> 접근불가 랙 출고량(비율)
+              </span>
+            </label>
+
+            <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={visibleMetrics.E}
+                onChange={() => toggleMetric('E')}
                 style={{ accentColor: '#00e676', cursor: 'pointer' }}
               />
-              <span style={{ color: visibleMetrics.D ? '#00e676' : 'var(--text-secondary)', fontWeight: visibleMetrics.D ? 700 : 400 }}>
-                <strong>(D)</strong> 접근가능 랙(야드) 출고량(비율)
+              <span style={{ color: visibleMetrics.E ? '#00e676' : 'var(--text-secondary)', fontWeight: visibleMetrics.E ? 700 : 400 }}>
+                <strong>(E)</strong> 접근가능 랙 출고량(비율)
               </span>
             </label>
           </div>

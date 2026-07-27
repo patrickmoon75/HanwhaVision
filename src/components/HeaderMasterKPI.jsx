@@ -1,7 +1,17 @@
 import React from 'react';
-import { ShieldAlert, Server, AlertTriangle, Layers, Calendar, Cpu } from 'lucide-react';
+import { ShieldAlert, Server, AlertTriangle, Layers, Calendar, Cpu, Database, FileSpreadsheet, FolderOpen, FileCheck } from 'lucide-react';
 
-export default function HeaderMasterKPI({ masterKPI, selectedDate, dates, onSelectDate, onOpenSimulator }) {
+export default function HeaderMasterKPI({ 
+  masterKPI, 
+  selectedDate, 
+  dates, 
+  onSelectDate, 
+  onOpenSimulator,
+  rackFileInfo,
+  inventoryFileInfo,
+  onReplaceRackFile,
+  onReplaceInventoryFile
+}) {
   if (!masterKPI) return null;
 
   return (
@@ -48,8 +58,81 @@ export default function HeaderMasterKPI({ masterKPI, selectedDate, dates, onSele
         </div>
       </div>
 
+      {/* File Status & Source File Switcher Bar */}
+      <div className="file-status-bar-container">
+        <div className="file-status-title">
+          <FileCheck size={16} color="var(--accent-cyan)" />
+          <span>현재 데이터소스 파일 정보 (랙 정보 / 재고 정보)</span>
+        </div>
+        <div className="file-status-grid">
+          {/* Rack File Info Chip */}
+          <div className="file-info-chip">
+            <div className="file-chip-icon rack">
+              <Database size={18} />
+            </div>
+            <div className="file-chip-body">
+              <div className="file-chip-header">
+                <span className="file-type-name">1. 랙 정보 파일</span>
+                <span className={`file-badge ${rackFileInfo?.isDefault ? 'badge-default' : 'badge-custom'}`}>
+                  {rackFileInfo?.isDefault ? '기본 파일 경로' : '사용자 지정 교체됨'}
+                </span>
+              </div>
+              <div className="file-path-text" title={rackFileInfo?.path || 'c:\\Users\\bosel\\Desktop\\한화비전 분석 프로그램\\Rack_20260720_수정.xlsx'}>
+                {rackFileInfo?.path || 'c:\\Users\\bosel\\Desktop\\한화비전 분석 프로그램\\Rack_20260720_수정.xlsx'}
+              </div>
+            </div>
+            <label className="btn-file-change">
+              <FolderOpen size={14} />
+              <span>파일 교체</span>
+              <input 
+                type="file" 
+                accept=".xlsx" 
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    onReplaceRackFile(e.target.files[0]);
+                  }
+                }}
+                style={{ display: 'none' }} 
+              />
+            </label>
+          </div>
+
+          {/* Inventory Data File Info Chip */}
+          <div className="file-info-chip">
+            <div className="file-chip-icon inventory">
+              <FileSpreadsheet size={18} />
+            </div>
+            <div className="file-chip-body">
+              <div className="file-chip-header">
+                <span className="file-type-name">2. 재고 (창고) 정보 파일</span>
+                <span className={`file-badge ${inventoryFileInfo?.isDefault ? 'badge-default' : 'badge-custom'}`}>
+                  {inventoryFileInfo?.isDefault ? '기본 파일 경로' : '사용자 지정 교체됨'}
+                </span>
+              </div>
+              <div className="file-path-text" title={inventoryFileInfo?.path || 'c:\\Users\\bosel\\Desktop\\한화비전 분석 프로그램\\창고데이터_수정.xlsx'}>
+                {inventoryFileInfo?.path || 'c:\\Users\\bosel\\Desktop\\한화비전 분석 프로그램\\창고데이터_수정.xlsx'}
+              </div>
+            </div>
+            <label className="btn-file-change">
+              <FolderOpen size={14} />
+              <span>파일 교체</span>
+              <input 
+                type="file" 
+                accept=".xlsx" 
+                onChange={(e) => {
+                  if (e.target.files && e.target.files[0]) {
+                    onReplaceInventoryFile(e.target.files[0]);
+                  }
+                }}
+                style={{ display: 'none' }} 
+              />
+            </label>
+          </div>
+        </div>
+      </div>
+
       {/* Master KPI Row */}
-      <div className="kpi-grid" style={{ marginTop: '8px' }}>
+      <div className="kpi-grid">
         <div className="kpi-card glass-card" style={{ '--card-accent': 'var(--accent-cyan)' }}>
           <div className="kpi-icon-wrapper">
             <Server size={24} />
