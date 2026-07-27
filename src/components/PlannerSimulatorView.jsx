@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ReferenceLine, ResponsiveContainer, Legend, Area, ComposedChart, Bar, BarChart, Cell
 } from 'recharts';
-import { FlaskConical, Play, RotateCcw, ChevronDown, ChevronUp, TrendingUp, Info } from 'lucide-react';
+import { FlaskConical, Play, RotateCcw, ChevronDown, ChevronUp, TrendingUp, Info, X } from 'lucide-react';
 import { runPlannerSimulation } from '../services/plannerSimulator';
 
 // ── 기본 Config (RWCS 현재 설정값과 동일) ─────────────────────────────────
@@ -97,13 +97,28 @@ function SimTooltip({ active, payload }) {
 }
 
 // ── 메인 컴포넌트 ─────────────────────────────────────────────────────────
-export default function PlannerSimulatorView({ pickingRows, yardIds, dates, dailyAnalytics }) {
+export default function PlannerSimulatorView({ 
+  pickingRows, 
+  yardIds, 
+  dates, 
+  dailyAnalytics,
+  selectedDate,
+  onSelectDate,
+  startDate,
+  endDate,
+  onRangeChange,
+  inventoryRows,
+  rackRows,
+  planRows
+}) {
   const [config, setConfig] = useState({ ...DEFAULT_CONFIG });
   const [simResults, setSimResults] = useState(null);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [showTopSkus, setShowTopSkus] = useState(null); // 선택된 날짜
   const [showConfig, setShowConfig] = useState(true);
+  const [isInfoOpen, setIsInfoOpen] = useState(false);
+  const [useActualPlan, setUseActualPlan] = useState(false); // 실제 배치계획 검증 모드
 
   const setField = (key, val) => setConfig(prev => ({ ...prev, [key]: val }));
 
@@ -133,6 +148,10 @@ export default function PlannerSimulatorView({ pickingRows, yardIds, dates, dail
           dailyAnalytics,
           plannerConfig: config,
           onProgress: setProgress,
+          inventoryRows,
+          rackRows,
+          planRows,
+          useActualPlan
         });
         setSimResults(results);
       } catch (err) {
@@ -142,7 +161,7 @@ export default function PlannerSimulatorView({ pickingRows, yardIds, dates, dail
         setProgress(100);
       }
     }, 50);
-  }, [pickingRows, yardIds, dates, dailyAnalytics, config]);
+  }, [pickingRows, yardIds, dates, dailyAnalytics, config, inventoryRows, rackRows, planRows, useActualPlan]);
 
   const handleReset = () => {
     setConfig({ ...DEFAULT_CONFIG });
@@ -150,28 +169,31 @@ export default function PlannerSimulatorView({ pickingRows, yardIds, dates, dail
     setProgress(0);
   };
 
-  // 차트 데이터
+  // 차트 데이터 (조회 기간 startDate ~ endDate 로 필터링)
   const chartData = useMemo(() => {
     if (!simResults) return [];
-    return simResults.map(r => ({
-      date: r.date.slice(5), // '06-01'
-      fullDate: r.date,
-      actualRate: r.actualRate,
-      simRate: r.simRate,
-      diff: r.diff,
-      totalQty: r.totalQty,
-      simYardQty: r.simYardQty,
-      actualYardQty: r.actualYardQty,
-      plannedSkuCount: r.plannedSkuCount,
-      totalSkuCount: r.totalSkuCount,
-      pickOrderCount: r.pickOrderCount,
-    }));
-  }, [simResults]);
+    return simResults
+      .filter(r => r.date >= startDate && r.date <= endDate)
+      .map(r => ({
+        date: r.date.slice(5), // '06-01'
+        fullDate: r.date,
+        actualRate: r.actualRate,
+        simRate: r.simRate,
+        diff: r.diff,
+        totalQty: r.totalQty,
+        simYardQty: r.simYardQty,
+        actualYardQty: r.actualYardQty,
+        plannedSkuCount: r.plannedSkuCount,
+        totalSkuCount: r.totalSkuCount,
+        pickOrderCount: r.pickOrderCount,
+      }));
+  }, [simResults, startDate, endDate]);
 
-  // 집계 통계
+  // 집계 통계 (조회 기간 startDate ~ endDate 로 필터링)
   const stats = useMemo(() => {
     if (!simResults || simResults.length === 0) return null;
-    const valid = simResults.filter(r => r.actualRate !== null && r.simRate !== null);
+    const filteredResults = simResults.filter(r => r.date >= startDate && r.date <= endDate);
+    const valid = filteredResults.filter(r => r.actualRate !== null && r.simRate !== null);
     if (valid.length === 0) return null;
 
     const totalActualYard = valid.reduce((s, r) => s + r.actualYardQty, 0);
@@ -186,8 +208,19 @@ export default function PlannerSimulatorView({ pickingRows, yardIds, dates, dail
     const worse = valid.filter(r => r.diff < 0).length;
     const same = valid.filter(r => r.diff === 0).length;
 
-    return { avgActual, avgSim, avgDiff, improved, worse, same, totalDays: valid.length };
-  }, [simResults]);
+    return { 
+      avgActual, 
+      avgSim, 
+      avgDiff, 
+      improved, 
+      worse, 
+      same, 
+      totalDays: valid.length,
+      totalQtyAll,
+      totalActualYard,
+      totalSimYard
+    };
+  }, [simResults, startDate, endDate]);
 
   return (
     <section className="glass-card" style={{ marginTop: '12px' }}>
@@ -332,62 +365,220 @@ export default function PlannerSimulatorView({ pickingRows, yardIds, dates, dail
         )}
       </div>
 
-      {/* ── 실행 버튼 ─────────────────────────────────────────────────── */}
-      <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', alignItems: 'center', flexWrap: 'wrap' }}>
-        <button
-          onClick={handleRun}
-          disabled={running}
-          style={{
+      {/* ── 실행 버튼 및 기간 연동 컨트롤 영역 ─────────────────────────────────── */}
+      <div style={{ 
+        display: 'flex', 
+        justifyContent: 'space-between', 
+        alignItems: 'center', 
+        marginBottom: '20px', 
+        flexWrap: 'wrap',
+        gap: '12px' 
+      }}>
+        {/* 실행 버튼 */}
+        <div style={{ display: 'flex', gap: '10px', alignItems: 'center' }}>
+          <button
+            onClick={handleRun}
+            disabled={running}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '8px',
+              padding: '10px 24px',
+              background: running ? 'rgba(167,139,250,0.3)' : 'linear-gradient(135deg, #7c3aed, #a78bfa)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#fff',
+              fontWeight: 700,
+              fontSize: '0.9rem',
+              cursor: running ? 'not-allowed' : 'pointer',
+              boxShadow: running ? 'none' : '0 4px 16px rgba(167,139,250,0.4)',
+              transition: 'all 0.2s',
+            }}
+          >
+            <Play size={16} />
+            {running ? `시뮬 실행 중... (${progress}%)` : '▶ 시뮬레이션 실행'}
+          </button>
+          {/* 실제 배치계획 검증 모드 토글 */}
+          <label style={{
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
-            padding: '10px 24px',
-            background: running ? 'rgba(167,139,250,0.3)' : 'linear-gradient(135deg, #7c3aed, #a78bfa)',
-            border: 'none',
+            cursor: 'pointer',
+            padding: '8px 14px',
+            background: useActualPlan ? 'rgba(0, 242, 254, 0.12)' : 'rgba(255,255,255,0.04)',
+            border: useActualPlan ? '1px solid rgba(0, 242, 254, 0.4)' : '1px solid rgba(255,255,255,0.1)',
             borderRadius: '8px',
-            color: '#fff',
-            fontWeight: 700,
-            fontSize: '0.9rem',
-            cursor: running ? 'not-allowed' : 'pointer',
-            boxShadow: running ? 'none' : '0 4px 16px rgba(167,139,250,0.4)',
-            transition: 'all 0.2s',
-          }}
-        >
-          <Play size={16} />
-          {running ? `시뮬 실행 중... (${progress}%)` : '▶ 시뮬레이션 실행'}
-        </button>
-        <button
-          onClick={handleReset}
-          style={{
+            transition: 'all 0.2s'
+          }}>
+            <input
+              type="checkbox"
+              checked={useActualPlan}
+              onChange={(e) => setUseActualPlan(e.target.checked)}
+              style={{ accentColor: '#00f2fe', width: '16px', height: '16px' }}
+            />
+            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: useActualPlan ? '#00f2fe' : 'var(--text-secondary)' }}>
+              실제 배치계획 검증
+            </span>
+          </label>
+          <button
+            onClick={handleReset}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '10px 16px',
+              background: 'rgba(255,255,255,0.07)',
+              border: '1px solid rgba(255,255,255,0.12)',
+              borderRadius: '8px',
+              color: 'var(--text-secondary)',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+            }}
+          >
+            <RotateCcw size={14} />
+            기본값 초기화
+          </button>
+          <button 
+            onClick={() => setIsInfoOpen(true)}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              padding: '10px 16px',
+              background: 'rgba(167, 139, 250, 0.1)',
+              border: '1px solid rgba(167, 139, 250, 0.25)',
+              borderRadius: '8px',
+              color: '#a78bfa',
+              fontWeight: 600,
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              transition: 'all 0.2s',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(167, 139, 250, 0.18)';
+              e.currentTarget.style.boxShadow = '0 0 10px rgba(167, 139, 250, 0.2)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = 'rgba(167, 139, 250, 0.1)';
+              e.currentTarget.style.boxShadow = 'none';
+            }}
+          >
+            <Info size={14} />
+            상세 설명
+          </button>
+          {running && (
+            <div style={{ width: '120px' }}>
+              <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
+                <div style={{
+                  height: '100%',
+                  width: `${progress}%`,
+                  background: 'linear-gradient(90deg, #7c3aed, #a78bfa)',
+                  borderRadius: '3px',
+                  transition: 'width 0.2s',
+                }} />
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* 우측: 조회 기간 셀렉터 및 평균 피킹율 정보 요약 */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
+          <div style={{
             display: 'flex',
             alignItems: 'center',
-            gap: '6px',
-            padding: '10px 16px',
-            background: 'rgba(255,255,255,0.07)',
-            border: '1px solid rgba(255,255,255,0.12)',
+            gap: '8px',
+            background: 'rgba(0, 0, 0, 0.3)',
+            padding: '6px 12px',
             borderRadius: '8px',
-            color: 'var(--text-secondary)',
-            fontWeight: 600,
-            fontSize: '0.85rem',
-            cursor: 'pointer',
-          }}
-        >
-          <RotateCcw size={14} />
-          기본값 초기화
-        </button>
-        {running && (
-          <div style={{ flex: 1, maxWidth: '300px' }}>
-            <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
-              <div style={{
-                height: '100%',
-                width: `${progress}%`,
-                background: 'linear-gradient(90deg, #7c3aed, #a78bfa)',
-                borderRadius: '3px',
-                transition: 'width 0.2s',
-              }} />
-            </div>
+            border: '1px solid var(--border-color)',
+            fontSize: '0.85rem'
+          }}>
+            <span style={{ color: 'var(--text-secondary)' }}>조회 기간:</span>
+            <select
+              value={startDate}
+              onChange={(e) => onRangeChange && onRangeChange(e.target.value, endDate)}
+              style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                color: '#fff',
+                border: '1px solid var(--border-color)',
+                borderRadius: '6px',
+                padding: '3px 8px',
+                fontSize: '0.83rem',
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              {dates.map(d => (
+                <option key={`sim-start-${d}`} value={d} disabled={endDate && d > endDate} style={{ background: '#111827', color: '#fff' }}>
+                  {d}
+                </option>
+              ))}
+            </select>
+            <span style={{ color: 'var(--text-secondary)' }}>~</span>
+            <select
+              value={endDate}
+              onChange={(e) => onRangeChange && onRangeChange(startDate, e.target.value)}
+              style={{
+                background: 'rgba(255, 255, 255, 0.08)',
+                color: '#fff',
+                border: '1px solid var(--border-color)',
+                borderRadius: '6px',
+                padding: '3px 8px',
+                fontSize: '0.83rem',
+                outline: 'none',
+                cursor: 'pointer'
+              }}
+            >
+              {dates.map(d => (
+                <option key={`sim-end-${d}`} value={d} disabled={startDate && d < startDate} style={{ background: '#111827', color: '#fff' }}>
+                  {d}
+                </option>
+              ))}
+            </select>
           </div>
-        )}
+
+          <div style={{
+            background: 'rgba(167, 139, 250, 0.1)',
+            border: '1px solid rgba(167, 139, 250, 0.25)',
+            borderRadius: '8px',
+            padding: '6px 14px',
+            fontSize: '0.82rem',
+            color: '#fff',
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px'
+          }}>
+            <span>선택 기간 평균 피킹율:</span>
+            {stats ? (
+              <>
+                <span style={{ color: '#00f2fe', fontWeight: 800 }}>실제 {stats.avgActual}%</span>
+                <span style={{ color: 'var(--text-muted)' }}>|</span>
+                <span style={{ color: '#a78bfa', fontWeight: 800 }}>시뮬 {stats.avgSim}%</span>
+                <span style={{ color: 'var(--text-muted)' }}>
+                  (야드 {stats.totalActualYard.toLocaleString()} → {stats.totalSimYard.toLocaleString()} / 전체 {stats.totalQtyAll.toLocaleString()} EA)
+                </span>
+              </>
+            ) : (
+              (() => {
+                const filteredDates = dates.filter(d => d >= startDate && d <= endDate);
+                const totalPeriodYardQty = filteredDates.reduce((sum, d) => sum + (dailyAnalytics[d]?.yardPickQty || 0), 0);
+                const totalPeriodPickQty = filteredDates.reduce((sum, d) => sum + (dailyAnalytics[d]?.totalPickQty || 0), 0);
+                const periodAvgRate = totalPeriodPickQty > 0
+                  ? ((totalPeriodYardQty / totalPeriodPickQty) * 100).toFixed(2)
+                  : '0.00';
+                return (
+                  <>
+                    <span style={{ color: '#00f2fe', fontWeight: 800 }}>실제 {periodAvgRate}%</span>
+                    <span style={{ color: 'var(--text-muted)' }}>
+                      (야드 {totalPeriodYardQty.toLocaleString()} / 전체 {totalPeriodPickQty.toLocaleString()} EA)
+                    </span>
+                  </>
+                );
+              })()
+            )}
+          </div>
+        </div>
       </div>
 
       {/* ── 시뮬 결과 ─────────────────────────────────────────────────── */}
@@ -450,6 +641,39 @@ export default function PlannerSimulatorView({ pickingRows, yardIds, dates, dail
             </div>
           </div>
 
+          {/* 선택일 상세 시뮬레이션 결과 */}
+          {(() => {
+            const selectedResult = simResults.find(r => r.date === selectedDate);
+            if (!selectedResult) return null;
+            const diffVal = selectedResult.diff;
+            return (
+              <div style={{
+                background: 'rgba(167, 139, 250, 0.08)',
+                border: '1px solid rgba(167, 139, 250, 0.25)',
+                borderRadius: '10px',
+                padding: '12px 18px',
+                marginBottom: '20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: '16px'
+              }}>
+                <div>
+                  <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>선택된 날짜:</span>
+                  <strong style={{ fontSize: '1.05rem', color: '#a78bfa', marginLeft: '6px' }}>{selectedDate}</strong>
+                </div>
+                <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', fontSize: '0.85rem' }}>
+                  <div>실제 피킹율: <strong style={{ color: '#00f2fe' }}>{selectedResult.actualRate !== null ? `${selectedResult.actualRate}%` : '—'}</strong></div>
+                  <div>시뮬 피킹율: <strong style={{ color: '#a78bfa' }}>{selectedResult.simRate !== null ? `${selectedResult.simRate}%` : '—'}</strong></div>
+                  <div>개선 효과: <strong style={{ color: diffVal >= 0 ? '#4ade80' : '#ff0844' }}>{diffVal !== null ? `${diffVal >= 0 ? '+' : ''}${diffVal}%p` : '—'}</strong></div>
+                  <div>출고 정보: <span style={{ color: 'var(--text-secondary)' }}>야드출고 {selectedResult.simYardQty.toLocaleString()} EA / 총출고 {selectedResult.totalQty.toLocaleString()} EA</span></div>
+                  <div>배치 SKU: <span style={{ color: 'var(--text-secondary)' }}>{selectedResult.plannedSkuCount.toLocaleString()}개 / 전체 {selectedResult.totalSkuCount.toLocaleString()}개</span></div>
+                </div>
+              </div>
+            );
+          })()}
+
           {/* 비교 차트 */}
           <div style={{ marginBottom: '8px' }}>
             <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#a78bfa', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
@@ -458,7 +682,17 @@ export default function PlannerSimulatorView({ pickingRows, yardIds, dates, dail
             </div>
             <div style={{ height: 280, width: '100%' }}>
               <ResponsiveContainer width="100%" height="100%">
-                <ComposedChart data={chartData} margin={{ top: 16, right: 30, left: 0, bottom: 8 }}>
+                <ComposedChart 
+                  data={chartData} 
+                  margin={{ top: 16, right: 30, left: 0, bottom: 8 }}
+                  onClick={(e) => {
+                    if (e && e.activePayload && e.activePayload[0]) {
+                      const clickedDate = e.activePayload[0].payload.fullDate;
+                      onSelectDate && onSelectDate(clickedDate);
+                    }
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
                   <defs>
                     <linearGradient id="simAreaGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="5%" stopColor="#a78bfa" stopOpacity={0.18} />
@@ -484,10 +718,27 @@ export default function PlannerSimulatorView({ pickingRows, yardIds, dates, dail
                     dataKey="actualRate"
                     stroke="#00f2fe"
                     strokeWidth={2.5}
-                    dot={{ r: 3, fill: '#00f2fe', stroke: '#000', strokeWidth: 1 }}
-                    activeDot={{ r: 7, fill: '#00f2fe' }}
+                    activeDot={{ r: 9, fill: '#00f2fe' }}
                     name="실제 피킹율"
                     connectNulls={true}
+                    dot={(props) => {
+                      const { cx, cy, payload } = props;
+                      if (!payload || payload.actualRate === null || cx === undefined || cy === undefined) return null;
+                      const isSel = payload.fullDate === selectedDate;
+                      return (
+                        <circle
+                          key={`act-${payload.fullDate}`}
+                          cx={cx}
+                          cy={cy}
+                          r={isSel ? 7 : 3.5}
+                          fill={isSel ? '#00f2fe' : '#4facfe'}
+                          stroke={isSel ? '#ffffff' : '#000000'}
+                          strokeWidth={isSel ? 3 : 1}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => onSelectDate && onSelectDate(payload.fullDate)}
+                        />
+                      );
+                    }}
                   />
                   {/* 시뮬 피킹율 */}
                   <Line
@@ -496,10 +747,27 @@ export default function PlannerSimulatorView({ pickingRows, yardIds, dates, dail
                     stroke="#a78bfa"
                     strokeWidth={2.5}
                     strokeDasharray="6 3"
-                    dot={{ r: 3, fill: '#a78bfa', stroke: '#000', strokeWidth: 1 }}
-                    activeDot={{ r: 7, fill: '#a78bfa' }}
+                    activeDot={{ r: 9, fill: '#a78bfa' }}
                     name="시뮬 피킹율"
                     connectNulls={true}
+                    dot={(props) => {
+                      const { cx, cy, payload } = props;
+                      if (!payload || payload.simRate === null || cx === undefined || cy === undefined) return null;
+                      const isSel = payload.fullDate === selectedDate;
+                      return (
+                        <circle
+                          key={`sim-${payload.fullDate}`}
+                          cx={cx}
+                          cy={cy}
+                          r={isSel ? 7 : 3.5}
+                          fill={isSel ? '#a78bfa' : '#7c3aed'}
+                          stroke={isSel ? '#ffffff' : '#000000'}
+                          strokeWidth={isSel ? 3 : 1}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => onSelectDate && onSelectDate(payload.fullDate)}
+                        />
+                      );
+                    }}
                   />
                   <Legend
                     iconType="line"
@@ -517,7 +785,17 @@ export default function PlannerSimulatorView({ pickingRows, yardIds, dates, dail
             </div>
             <div style={{ height: 130, width: '100%' }}>
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 4, right: 30, left: 0, bottom: 4 }}>
+                <BarChart 
+                  data={chartData} 
+                  margin={{ top: 4, right: 30, left: 0, bottom: 4 }}
+                  onClick={(e) => {
+                    if (e && e.activePayload && e.activePayload[0]) {
+                      const clickedDate = e.activePayload[0].payload.fullDate;
+                      onSelectDate && onSelectDate(clickedDate);
+                    }
+                  }}
+                  style={{ cursor: 'pointer' }}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
                   <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 10 }} />
                   <YAxis stroke="var(--text-secondary)" tick={{ fontSize: 10 }} unit="%p" />
@@ -532,12 +810,19 @@ export default function PlannerSimulatorView({ pickingRows, yardIds, dates, dail
                     radius={[3, 3, 0, 0]}
                     label={false}
                   >
-                    {chartData.map((entry, idx) => (
-                      <Cell
-                        key={idx}
-                        fill={entry.diff !== null ? (entry.diff >= 0 ? '#4ade80' : '#ff0844') : '#94a3b8'}
-                      />
-                    ))}
+                    {chartData.map((entry, idx) => {
+                      const isSel = entry.fullDate === selectedDate;
+                      return (
+                        <Cell
+                          key={idx}
+                          fill={entry.diff !== null ? (entry.diff >= 0 ? '#4ade80' : '#ff0844') : '#94a3b8'}
+                          stroke={isSel ? '#ffffff' : 'none'}
+                          strokeWidth={isSel ? 2 : 0}
+                          style={{ cursor: 'pointer' }}
+                          onClick={() => onSelectDate && onSelectDate(entry.fullDate)}
+                        />
+                      );
+                    })}
                   </Bar>
                 </BarChart>
               </ResponsiveContainer>
@@ -559,32 +844,42 @@ export default function PlannerSimulatorView({ pickingRows, yardIds, dates, dail
                   </tr>
                 </thead>
                 <tbody>
-                  {simResults.map((r, idx) => (
-                    <tr
-                      key={r.date}
-                      style={{
-                        background: idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent',
-                        borderBottom: '1px solid rgba(255,255,255,0.04)',
-                      }}
-                    >
-                      <td style={{ padding: '6px 10px', textAlign: 'center', color: '#f1f5f9', fontWeight: 600 }}>{r.date}</td>
-                      <td style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)' }}>{r.pickOrderCount}건</td>
-                      <td style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)' }}>{r.totalQty.toLocaleString()}</td>
-                      <td style={{ padding: '6px 10px', textAlign: 'center', color: '#00f2fe' }}>{r.actualYardQty.toLocaleString()}</td>
-                      <td style={{ padding: '6px 10px', textAlign: 'center', color: '#a78bfa' }}>{r.simYardQty.toLocaleString()}</td>
-                      <td style={{ padding: '6px 10px', textAlign: 'center', color: '#00f2fe', fontWeight: 700 }}>
-                        {r.actualRate !== null ? `${r.actualRate}%` : '—'}
-                      </td>
-                      <td style={{ padding: '6px 10px', textAlign: 'center', color: '#a78bfa', fontWeight: 700 }}>
-                        {r.simRate !== null ? `${r.simRate}%` : '—'}
-                      </td>
-                      <td style={{ padding: '6px 10px', textAlign: 'center', fontWeight: 700, color: r.diff === null ? '#94a3b8' : r.diff > 0 ? '#4ade80' : r.diff < 0 ? '#ff0844' : '#94a3b8' }}>
-                        {r.diff !== null ? `${r.diff >= 0 ? '+' : ''}${r.diff}%p` : '—'}
-                      </td>
-                      <td style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)' }}>{r.plannedSkuCount.toLocaleString()}</td>
-                      <td style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)' }}>{r.totalSkuCount.toLocaleString()}</td>
-                    </tr>
-                  ))}
+                  {simResults
+                    .filter(r => r.date >= startDate && r.date <= endDate)
+                    .map((r, idx) => {
+                      const isSel = r.date === selectedDate;
+                      return (
+                        <tr
+                          key={r.date}
+                          style={{
+                            background: isSel 
+                              ? 'rgba(167, 139, 250, 0.15)' 
+                              : (idx % 2 === 0 ? 'rgba(255,255,255,0.01)' : 'transparent'),
+                            borderBottom: '1px solid rgba(255,255,255,0.04)',
+                            cursor: 'pointer',
+                            fontWeight: isSel ? 'bold' : 'normal'
+                          }}
+                          onClick={() => onSelectDate && onSelectDate(r.date)}
+                        >
+                          <td style={{ padding: '6px 10px', textAlign: 'center', color: isSel ? '#a78bfa' : '#f1f5f9', fontWeight: 600 }}>{r.date}</td>
+                          <td style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)' }}>{r.pickOrderCount}건</td>
+                          <td style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)' }}>{r.totalQty.toLocaleString()}</td>
+                          <td style={{ padding: '6px 10px', textAlign: 'center', color: '#00f2fe' }}>{r.actualYardQty.toLocaleString()}</td>
+                          <td style={{ padding: '6px 10px', textAlign: 'center', color: '#a78bfa' }}>{r.simYardQty.toLocaleString()}</td>
+                          <td style={{ padding: '6px 10px', textAlign: 'center', color: '#00f2fe', fontWeight: 700 }}>
+                            {r.actualRate !== null ? `${r.actualRate}%` : '—'}
+                          </td>
+                          <td style={{ padding: '6px 10px', textAlign: 'center', color: '#a78bfa', fontWeight: 700 }}>
+                            {r.simRate !== null ? `${r.simRate}%` : '—'}
+                          </td>
+                          <td style={{ padding: '6px 10px', textAlign: 'center', fontWeight: 700, color: r.diff === null ? '#94a3b8' : r.diff > 0 ? '#4ade80' : r.diff < 0 ? '#ff0844' : '#94a3b8' }}>
+                            {r.diff !== null ? `${r.diff >= 0 ? '+' : ''}${r.diff}%p` : '—'}
+                          </td>
+                          <td style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)' }}>{r.plannedSkuCount.toLocaleString()}</td>
+                          <td style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)' }}>{r.totalSkuCount.toLocaleString()}</td>
+                        </tr>
+                      );
+                    })}
                 </tbody>
               </table>
             </div>
@@ -610,6 +905,181 @@ export default function PlannerSimulatorView({ pickingRows, yardIds, dates, dail
           </p>
         </div>
       )}
+
+      <SimulationInfoModal isOpen={isInfoOpen} onClose={() => setIsInfoOpen(false)} />
     </section>
+  );
+}
+
+// ── 시뮬레이션 상세 설명 모달 컴포넌트 ─────────────────────────────────────────
+function SimulationInfoModal({ isOpen, onClose }) {
+  if (!isOpen) return null;
+  return (
+    <div style={{
+      position: 'fixed',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: 'rgba(3, 7, 18, 0.85)',
+      backdropFilter: 'blur(12px)',
+      zIndex: 9999,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '20px'
+    }}>
+      <div style={{
+        background: 'rgba(17, 24, 39, 0.95)',
+        border: '1px solid rgba(167, 139, 250, 0.3)',
+        borderRadius: '16px',
+        width: '100%',
+        maxWidth: '750px',
+        maxHeight: '85vh',
+        boxShadow: '0 25px 50px -12px rgba(167, 139, 250, 0.25)',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
+        color: '#f1f5f9'
+      }}>
+        {/* 모달 헤더 */}
+        <div style={{
+          padding: '20px 24px',
+          borderBottom: '1px solid rgba(255, 255, 255, 0.08)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          background: 'linear-gradient(135deg, rgba(167, 139, 250, 0.08), rgba(0, 0, 0, 0))'
+        }}>
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 800, color: '#a78bfa', margin: 0, display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Info size={20} color="#a78bfa" />
+            배치계획 시뮬레이션 엔진 연산 메커니즘
+          </h3>
+          <button 
+            onClick={onClose}
+            style={{
+              background: 'rgba(255, 255, 255, 0.05)',
+              border: 'none',
+              borderRadius: '50%',
+              width: '32px',
+              height: '32px',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: '#94a3b8',
+              cursor: 'pointer',
+              transition: 'all 0.15s'
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = '#fff'}
+            onMouseLeave={(e) => e.currentTarget.style.color = '#94a3b8'}
+          >
+            <X size={18} />
+          </button>
+        </div>
+
+        {/* 모달 바디 (스크롤 가능) */}
+        <div style={{
+          padding: '24px',
+          overflowY: 'auto',
+          fontSize: '0.88rem',
+          lineHeight: '1.6',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '20px'
+        }}>
+          {/* 개요 */}
+          <div style={{ background: 'rgba(255, 255, 255, 0.03)', borderLeft: '3px solid #a78bfa', padding: '12px 16px', borderRadius: '4px' }}>
+            이 시뮬레이션은 <strong>"특정 분석일(Day D)에 설정값(Config)을 다르게 설계하여 전진 배치를 진행했다면, 실제 대비 야드 피킹 효율이 어떻게 변화했는가?"</strong>를 시계열적으로 역산하여 성능 향상 한계선을 검증하는 분석 도구입니다.
+          </div>
+
+          {/* 핵심 전제 조건 */}
+          <div>
+            <h4 style={{ color: '#fff', fontSize: '0.95rem', fontWeight: 700, marginBottom: '6px' }}>📌 핵심 전제 조건 (Optimistic Ceiling)</h4>
+            <ul style={{ paddingLeft: '20px', listStyleType: 'disc', color: '#cbd5e1', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+              <li>시뮬레이터가 선정한 전진배치 품목(SKU)이 당일 출고 요청을 받으면, <strong>해당 품목 주문의 100%를 야드(가용 구역)에서 출고 처리할 수 있다</strong>고 가정합니다.</li>
+              <li>현장의 실재고 수량은 충분하며, 지게차 및 AGF 등의 이송 지연이나 실패율(로봇 오류)은 발생하지 않는다는 시스템 이상 상태를 기준으로 한 최대 효율을 산정합니다.</li>
+            </ul>
+          </div>
+
+          {/* 단계별 프로세스 */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
+            <h4 style={{ color: '#fff', fontSize: '0.95rem', fontWeight: 700, margin: 0 }}>⚙️ 일자별(Day D) 세부 계산 알고리즘</h4>
+            
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+              <div style={{ background: 'rgba(0, 0, 0, 0.2)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ color: '#a78bfa', fontWeight: 700, fontSize: '0.82rem', display: 'block', marginBottom: '4px' }}>1단계: 과거 피킹 이력 집계 (Lookback)</div>
+                <div>Day D의 배치 계획을 결정하기 위해 과거 60일(<code>lookbackPeriod</code>) 동안 발생한 누적 피킹오더 수량을 SKU 단위로 추적하여 <strong>주문 건수(Order Count)</strong>와 <strong>총 출고 수량(Outbound Qty)</strong>을 집계합니다.</div>
+              </div>
+
+              <div style={{ background: 'rgba(0, 0, 0, 0.2)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ color: '#a78bfa', fontWeight: 700, fontSize: '0.82rem', display: 'block', marginBottom: '4px' }}>2단계: 가중치 점수(Priority Score) 연산 & 정렬</div>
+                <div>두 집계 수치를 최댓값 기준 0~1 값으로 정규화한 뒤, 설정값(예: 주문 건수 비율 70%, 수량 비율 30%)에 맞춰 최종 스코어를 도출합니다.
+                  <div style={{ fontFamily: 'Outfit, monospace', background: 'rgba(255,255,255,0.03)', padding: '6px 10px', borderRadius: '6px', margin: '8px 0', fontSize: '0.8rem', color: '#00f2fe', textAlign: 'center', border: '1px dashed rgba(0, 242, 254, 0.2)' }}>
+                    Score = (정규화 주문건수 × 주문비율) + (정규화 출고량 × 수량비율)
+                  </div>
+                  점수를 기준으로 전체 SKU를 내림차순 정렬하여 백분위 순위를 지정합니다.
+                </div>
+              </div>
+
+              <div style={{ background: 'rgba(0, 0, 0, 0.2)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ color: '#a78bfa', fontWeight: 700, fontSize: '0.82rem', display: 'block', marginBottom: '4px' }}>3단계: 마진 적용 및 전진배치 품목(plannedSkus) 확정</div>
+                <div>최하위 점수군(<code>bottomRankCutoff</code>)은 전진 배치에서 탈락시키고, 최상위 고빈도 순위군(예: 상위 10%)은 설정된 파레트 수량 한도(<code>palletLimit</code>)에 마진비율(예: +30%)을 상향 부여하여 보관 슬롯 공간을 최종 확정합니다.</div>
+              </div>
+
+              <div style={{ background: 'rgba(0, 0, 0, 0.2)', padding: '14px', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.04)' }}>
+                <div style={{ color: '#a78bfa', fontWeight: 700, fontSize: '0.82rem', display: 'block', marginBottom: '4px' }}>4단계: 가상 야드 출고량 및 피킹율 도출</div>
+                <div>실제 발생한 Day D 당일의 피킹오더 중, 3단계에서 선정한 <strong>시뮬레이션 전진배치 대상품목(Planned SKUs)</strong>이거나 <strong>이미 야드 내에 보관 중인 품목(Yard Layout)</strong>에 지시된 수량을 합산하여 <strong>가상 야드 출고량</strong>을 도출합니다.
+                  <div style={{ fontFamily: 'Outfit, monospace', background: 'rgba(255,255,255,0.03)', padding: '6px 10px', borderRadius: '6px', margin: '8px 0', fontSize: '0.8rem', color: '#a78bfa', textAlign: 'center', border: '1px dashed rgba(167, 139, 250, 0.2)' }}>
+                    시뮬레이션 피킹율(%) = (가상 야드 출고 수량 ÷ 당일 총 출고 수량) × 100
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* 기간 가중 평균 */}
+          <div>
+            <h4 style={{ color: '#fff', fontSize: '0.95rem', fontWeight: 700, marginBottom: '6px' }}>📊 기간 가중 평균 피킹율 산식</h4>
+            <div style={{ background: 'rgba(255, 255, 255, 0.02)', padding: '14px', borderRadius: '8px', color: '#cbd5e1', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span>차트 상단의 평균 피킹율 지표는 개별 일자별 효율의 산술평균이 아닌, <strong>조회 기간 전체의 누적 출고 수량 합계</strong>를 기준으로 분율 계산됩니다.</span>
+              <div style={{ fontSize: '0.81rem', borderTop: '1px solid rgba(255,255,255,0.05)', paddingTop: '8px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                <div>• <strong>실제 평균 피킹율</strong> = 조회기간 누적 실제 야드 출고량 ÷ 조회기간 누적 총 출고량 × 100</div>
+                <div>• <strong>시뮬 평균 피킹율</strong> = 조회기간 누적 가상 야드 출고량 ÷ 조회기간 누적 총 출고량 × 100</div>
+                <div>• <strong>평균 개선 효과</strong> = 시뮬레이션 평균 피킹율(%) - 실제 평균 피킹율(%)</div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 모달 푸터 */}
+        <div style={{
+          padding: '16px 24px',
+          borderTop: '1px solid rgba(255, 255, 255, 0.08)',
+          background: 'rgba(0, 0, 0, 0.2)',
+          display: 'flex',
+          justifyContent: 'flex-end'
+        }}>
+          <button 
+            onClick={onClose}
+            style={{
+              background: 'linear-gradient(135deg, #7c3aed, #a78bfa)',
+              border: 'none',
+              borderRadius: '8px',
+              color: '#fff',
+              fontWeight: 700,
+              padding: '8px 24px',
+              fontSize: '0.85rem',
+              cursor: 'pointer',
+              boxShadow: '0 4px 16px rgba(167,139,250,0.3)',
+              transition: 'all 0.2s'
+            }}
+            onMouseEnter={(e) => e.target.style.boxShadow = '0 6px 20px rgba(167,139,250,0.4)'}
+            onMouseLeave={(e) => e.target.style.boxShadow = '0 4px 16px rgba(167,139,250,0.3)'}
+          >
+            확인 및 닫기
+          </button>
+        </div>
+      </div>
+    </div>
   );
 }

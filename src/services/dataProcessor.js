@@ -1,8 +1,88 @@
 import * as XLSX from 'xlsx';
+import { supabase, isSupabaseConfigured } from './supabaseClient';
+
+// Helper to fetch all rows from a Supabase table by bypassing the 1000-row PostgREST limit using pagination
+async function fetchAllFromTable(tableName) {
+  // 1. Get total count of rows
+  const { count, error: countErr } = await supabase
+    .from(tableName)
+    .select('*', { count: 'exact', head: true });
+  
+  if (countErr) throw countErr;
+  
+  const limit = 1000;
+  const totalPages = Math.ceil(count / limit);
+  const allData = new Array(totalPages);
+  
+  // Fetch with controlled concurrency to prevent browser/network congestion
+  const maxConcurrency = 10;
+  let pageIndex = 0;
+  
+  async function worker() {
+    while (true) {
+      const myPage = pageIndex++;
+      if (myPage >= totalPages) break;
+      
+      const from = myPage * limit;
+      const to = from + limit - 1;
+      
+      const { data, error } = await supabase
+        .from(tableName)
+        .select('*')
+        .range(from, to);
+        
+      if (error) throw error;
+      allData[myPage] = data;
+    }
+  }
+  
+  const workers = [];
+  const activeWorkersCount = Math.min(maxConcurrency, totalPages);
+  for (let i = 0; i < activeWorkersCount; i++) {
+    workers.push(worker());
+  }
+  
+  await Promise.all(workers);
+  return allData.flat();
+}
 
 export async function loadAndProcessData() {
+  if (isSupabaseConfigured && supabase) {
+    try {
+      console.log("Supabase configured. Attempting to fetch data from database...");
+      
+      // Load static rack layout locally (as it is not part of the daily operational DB)
+      const rackRes = await fetch('/Rack_20260720_수정.xlsx');
+      const rackBlob = await rackRes.arrayBuffer();
+      const wbRack = XLSX.read(rackBlob, { type: 'array' });
+      const rackRows = XLSX.utils.sheet_to_json(wbRack.Sheets[wbRack.SheetNames[0]]);
+
+      console.log("Fetching operational datasets in paginated chunks...");
+      const [planRows, missionRows, inventoryRows, pickingRows] = await Promise.all([
+        fetchAllFromTable('batch_plans'),
+        fetchAllFromTable('mission_logs'),
+        fetchAllFromTable('inventory_status'),
+        fetchAllFromTable('picking_orders')
+      ]);
+
+      console.log("Supabase fetch successful:", {
+        planRowsCount: planRows.length,
+        missionRowsCount: missionRows.length,
+        inventoryRowsCount: inventoryRows.length,
+        pickingRowsCount: pickingRows.length
+      });
+
+      const rawDatasets = { rackRows, planRows, missionRows, inventoryRows, pickingRows };
+      const processed = processRawDatasets(rawDatasets);
+      return { ...processed, rawDatasets, dataSource: 'supabase' };
+    } catch (err) {
+      console.warn("Supabase fetch failed. Falling back to local Excel files:", err);
+    }
+  }
+
+  // Fallback to local files
   try {
-    // Read local files via fetch or xlsx readFile if running in node/browser
+    console.log("Loading data from local Excel files...");
     const rackRes = await fetch('/Rack_20260720_수정.xlsx');
     const rackBlob = await rackRes.arrayBuffer();
     const wbRack = XLSX.read(rackBlob, { type: 'array' });
@@ -19,7 +99,7 @@ export async function loadAndProcessData() {
 
     const rawDatasets = { rackRows, planRows, missionRows, inventoryRows, pickingRows };
     const processed = processRawDatasets(rawDatasets);
-    return { ...processed, rawDatasets };
+    return { ...processed, rawDatasets, dataSource: 'excel' };
   } catch (err) {
     console.error("Data loading error, fallback to fallback data mode:", err);
     throw err;
@@ -136,7 +216,7 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
     // (A) 피킹오더 수: PickTaskId 기준 중복제거 갯수
     const pickTaskSet = new Set();
     dayPickings.forEach(p => {
-      const taskId = p.PickTaskId || p.pickTaskId || p.PickTaskID || p.TaskId;
+      const taskId = p.PickTaskId || p.PicktaskId || p.pickTaskId || p.PickTaskID || p.TaskId;
       if (taskId) pickTaskSet.add(taskId);
       else pickTaskSet.add(JSON.stringify(p));
     });
@@ -159,14 +239,8 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
     });
     const blockedPickRate = totalPickQty > 0 ? ((blockedRackPickQty / totalPickQty) * 100).toFixed(2) : '0.00';
 
-    // (E) 접근가능 랙 출고량: LocationId의 Blocked가 FALSE인 랙에서 출고되는 아이템 수량 합계
-    let availRackPickQty = 0;
-    dayPickings.forEach(p => {
-      const r = rackMap.get(p.LocationId);
-      if (!r || (r.Blocked !== true && String(r.Blocked).toUpperCase() !== 'TRUE')) {
-        availRackPickQty += (Number(p.ItemQty) || 0);
-      }
-    });
+    // (E) 야드 외 출고량: 총출고량 - 야드에서 출고량 - 접근불가 랙 출고량
+    const availRackPickQty = Math.max(0, totalPickQty - yardPickQty - blockedRackPickQty);
     const availPickRate = totalPickQty > 0 ? ((availRackPickQty / totalPickQty) * 100).toFixed(2) : '0.00';
 
     // Day N Plans

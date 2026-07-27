@@ -10,7 +10,8 @@ export default function HeaderMasterKPI({
   rackFileInfo,
   inventoryFileInfo,
   onReplaceRackFile,
-  onReplaceInventoryFile
+  onReplaceInventoryFile,
+  dataSource
 }) {
   if (!masterKPI) return null;
 
@@ -60,9 +61,36 @@ export default function HeaderMasterKPI({
 
       {/* File Status & Source File Switcher Bar */}
       <div className="file-status-bar-container">
-        <div className="file-status-title">
-          <FileCheck size={16} color="var(--accent-cyan)" />
-          <span>현재 데이터소스 파일 정보 (랙 정보 / 재고 정보)</span>
+        <div className="file-status-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {dataSource === 'supabase' ? <Database size={16} color="#10b981" /> : <FileCheck size={16} color="var(--accent-cyan)" />}
+            <span>현재 데이터소스: {dataSource === 'supabase' ? 'Supabase Database (실시간 연동)' : '로컬 엑셀 파일 정보'}</span>
+          </div>
+          {dataSource === 'supabase' && (
+            <span style={{ 
+              display: 'inline-flex', 
+              alignItems: 'center', 
+              gap: '6px', 
+              background: 'rgba(16, 185, 129, 0.15)', 
+              color: '#10b981', 
+              padding: '4px 10px', 
+              borderRadius: '12px', 
+              fontSize: '0.75rem', 
+              fontWeight: 'bold',
+              border: '1px solid rgba(16, 185, 129, 0.3)',
+              boxShadow: '0 0 8px rgba(16,185,129,0.1)'
+            }}>
+              <span style={{ 
+                width: '6px', 
+                height: '6px', 
+                backgroundColor: '#10b981', 
+                borderRadius: '50%', 
+                display: 'inline-block',
+                boxShadow: '0 0 4px #10b981'
+              }}></span>
+              LIVE CONNECTED
+            </span>
+          )}
         </div>
         <div className="file-status-grid">
           {/* Rack File Info Chip */}

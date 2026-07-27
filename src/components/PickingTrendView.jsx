@@ -29,10 +29,10 @@ export default function PickingTrendView({
     if (onRangeChange) onRangeChange(startDate, val);
   };
   
-  // (A)~(E) 항목별 보이거나 숨김 토글 상태 (기본값: 모두 미선택하여 차트를 깔끔하게 표시)
+  // (A)~(E) 항목별 보이거나 숨김 토글 상태 (기본값: B(총출고량) 활성화)
   const [visibleMetrics, setVisibleMetrics] = useState({
     A: false,
-    B: false,
+    B: true,
     C: false,
     D: false,
     E: false
@@ -156,7 +156,7 @@ export default function PickingTrendView({
               <>
                 (C) 야드에서 출고량: <strong style={{ color: '#00f2fe' }}>{data.yardQty.toLocaleString()} EA ({data.pickingRate}%)</strong><br />
                 (D) 접근불가 랙 출고량: <strong style={{ color: '#ffb199' }}>{data.blockedQty.toLocaleString()} EA ({data.blockedRate}%)</strong><br />
-                (E) 접근가능 랙 출고량: <strong style={{ color: '#00e676' }}>{data.availQty.toLocaleString()} EA ({data.availRate}%)</strong>
+                (E) 야드 외 출고량: <strong style={{ color: '#00e676' }}>{data.availQty.toLocaleString()} EA ({data.availRate}%)</strong>
               </>
             ) : (
               <span style={{ color: '#94a3b8', display: 'inline-block', margin: '4px 0' }}>
@@ -180,16 +180,31 @@ export default function PickingTrendView({
     const isSel = itemData.fullDate === selectedDate;
 
     return (
-      <text
-        x={x}
-        y={y - 9}
-        fill={isSel ? '#00f2fe' : '#94a3b8'}
-        fontSize={isSel ? '11px' : '9.5px'}
-        fontWeight={isSel ? '800' : '600'}
-        textAnchor="middle"
-      >
-        {value}%
-      </text>
+      <g>
+        {/* (B) 총출고량 라벨을 피킹율 수치 위에 표시 */}
+        {visibleMetrics.B && (
+          <text
+            x={x}
+            y={y - 21}
+            fill={isSel ? '#00f2fe' : '#94a3b8'}
+            fontSize={isSel ? '10px' : '8.5px'}
+            fontWeight="700"
+            textAnchor="middle"
+          >
+            (B){itemData.totalQty.toLocaleString()}
+          </text>
+        )}
+        <text
+          x={x}
+          y={y - 8}
+          fill={isSel ? '#00f2fe' : '#94a3b8'}
+          fontSize={isSel ? '11px' : '9.5px'}
+          fontWeight={isSel ? '800' : '600'}
+          textAnchor="middle"
+        >
+          {value}%
+        </text>
+      </g>
     );
   };
 
@@ -222,10 +237,10 @@ export default function PickingTrendView({
 
     const items = [];
     if (visibleMetrics.A) items.push({ key: 'A', text: `(A)${itemData.pickOrderCount}건`, fill: mainColor, size: '8.5px' });
-    if (visibleMetrics.B) items.push({ key: 'B', text: `(B)${itemData.totalQty.toLocaleString()}`, fill: mainColor, size: '8.5px' });
+    // B(총출고량)는 이제 피킹율 위에 표시되므로 하단 서브 라벨 목록에서 제외합니다.
     if (visibleMetrics.C && itemData.hasPickOrders) items.push({ key: 'C', text: `(C)야드:${itemData.yardQty.toLocaleString()}(${itemData.pickingRate}%)`, fill: '#00f2fe', size: '8px' });
     if (visibleMetrics.D && itemData.hasPickOrders) items.push({ key: 'D', text: `(D)접근불가:${itemData.blockedQty.toLocaleString()}(${itemData.blockedRate}%)`, fill: '#ffb199', size: '8px' });
-    if (visibleMetrics.E && itemData.hasPickOrders) items.push({ key: 'E', text: `(E)접근가능:${itemData.availQty.toLocaleString()}(${itemData.availRate}%)`, fill: '#00e676', size: '8px' });
+    if (visibleMetrics.E && itemData.hasPickOrders) items.push({ key: 'E', text: `(E)야드외:${itemData.availQty.toLocaleString()}(${itemData.availRate}%)`, fill: '#00e676', size: '8px' });
 
     if (items.length === 0) return null;
 
@@ -532,7 +547,7 @@ export default function PickingTrendView({
                 style={{ accentColor: '#00e676', cursor: 'pointer' }}
               />
               <span style={{ color: visibleMetrics.E ? '#00e676' : 'var(--text-secondary)', fontWeight: visibleMetrics.E ? 700 : 400 }}>
-                <strong>(E)</strong> 접근가능 랙 출고량(비율)
+                <strong>(E)</strong> 야드 외 출고량(비율)
               </span>
             </label>
           </div>

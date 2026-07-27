@@ -60,6 +60,13 @@ export default function App() {
           setStartDate(result.dates[0]);
           setEndDate(result.dates[result.dates.length - 1]);
         }
+        if (result.dataSource === 'supabase') {
+          setInventoryFileInfo({
+            name: 'Supabase Database',
+            path: 'Live Database Connection: Rest API ( resolution=merge-duplicates )',
+            isDefault: false
+          });
+        }
       } catch (err) {
         console.error("Default fetch failed, listening for manual file uploads:", err);
       } finally {
@@ -271,6 +278,7 @@ export default function App() {
         inventoryFileInfo={inventoryFileInfo}
         onReplaceRackFile={handleReplaceRackFile}
         onReplaceInventoryFile={handleReplaceInventoryFile}
+        dataSource={data.dataSource || 'excel'}
       />
 
       {/* 2. RWCS Exception Alert Banner (Filtered by Date Range) */}
@@ -312,6 +320,17 @@ export default function App() {
         yardIds={simYardIds}
         dates={data.dates}
         dailyAnalytics={data.dailyAnalytics}
+        selectedDate={selectedDate}
+        onSelectDate={setSelectedDate}
+        startDate={startDate}
+        endDate={endDate}
+        onRangeChange={(s, e) => {
+          setStartDate(s);
+          setEndDate(e);
+        }}
+        inventoryRows={rawDatasets.inventoryRows}
+        rackRows={rawDatasets.rackRows}
+        planRows={rawDatasets.planRows}
       />
 
       {/* 7. Slotting Engine Feedback Simulator Modal */}
