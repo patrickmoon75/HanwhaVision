@@ -46,64 +46,69 @@ async function fetchAllFromTable(tableName) {
   return allData.flat();
 }
 
+export async function fetchSupabaseData() {
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error("Supabase URL or Key is not configured in environment variables.");
+  }
+  
+  console.log("Supabase configured. Attempting to fetch data from database...");
+  
+  // Load static rack layout locally (as it is not part of the daily operational DB)
+  const rackRes = await fetch('/Rack_20260720_수정.xlsx');
+  const rackBlob = await rackRes.arrayBuffer();
+  const wbRack = XLSX.read(rackBlob, { type: 'array' });
+  const rackRows = XLSX.utils.sheet_to_json(wbRack.Sheets[wbRack.SheetNames[0]]);
+
+  console.log("Fetching operational datasets in paginated chunks...");
+  const [planRows, missionRows, inventoryRows, pickingRows] = await Promise.all([
+    fetchAllFromTable('batch_plans'),
+    fetchAllFromTable('mission_logs'),
+    fetchAllFromTable('inventory_status'),
+    fetchAllFromTable('picking_orders')
+  ]);
+
+  console.log("Supabase fetch successful:", {
+    planRowsCount: planRows.length,
+    missionRowsCount: missionRows.length,
+    inventoryRowsCount: inventoryRows.length,
+    pickingRowsCount: pickingRows.length
+  });
+
+  const rawDatasets = { rackRows, planRows, missionRows, inventoryRows, pickingRows };
+  const processed = processRawDatasets(rawDatasets);
+  return { ...processed, rawDatasets, dataSource: 'supabase' };
+}
+
+export async function fetchExcelData() {
+  console.log("Loading data from local Excel files...");
+  const rackRes = await fetch('/Rack_20260720_수정.xlsx');
+  const rackBlob = await rackRes.arrayBuffer();
+  const wbRack = XLSX.read(rackBlob, { type: 'array' });
+  const rackRows = XLSX.utils.sheet_to_json(wbRack.Sheets[wbRack.SheetNames[0]]);
+
+  const dataRes = await fetch('/창고데이터_수정.xlsx');
+  const dataBlob = await dataRes.arrayBuffer();
+  const wbData = XLSX.read(dataBlob, { type: 'array' });
+
+  const planRows = XLSX.utils.sheet_to_json(wbData.Sheets['배치계획'] || wbData.Sheets[wbData.SheetNames[0]]);
+  const missionRows = XLSX.utils.sheet_to_json(wbData.Sheets['미션로그'] || wbData.Sheets[wbData.SheetNames[1]]);
+  const inventoryRows = XLSX.utils.sheet_to_json(wbData.Sheets['재고현황'] || wbData.Sheets[wbData.SheetNames[2]]);
+  const pickingRows = XLSX.utils.sheet_to_json(wbData.Sheets['피킹오더'] || wbData.Sheets[wbData.SheetNames[3]]);
+
+  const rawDatasets = { rackRows, planRows, missionRows, inventoryRows, pickingRows };
+  const processed = processRawDatasets(rawDatasets);
+  return { ...processed, rawDatasets, dataSource: 'excel' };
+}
+
 export async function loadAndProcessData() {
   if (isSupabaseConfigured && supabase) {
     try {
-      console.log("Supabase configured. Attempting to fetch data from database...");
-      
-      // Load static rack layout locally (as it is not part of the daily operational DB)
-      const rackRes = await fetch('/Rack_20260720_수정.xlsx');
-      const rackBlob = await rackRes.arrayBuffer();
-      const wbRack = XLSX.read(rackBlob, { type: 'array' });
-      const rackRows = XLSX.utils.sheet_to_json(wbRack.Sheets[wbRack.SheetNames[0]]);
-
-      console.log("Fetching operational datasets in paginated chunks...");
-      const [planRows, missionRows, inventoryRows, pickingRows] = await Promise.all([
-        fetchAllFromTable('batch_plans'),
-        fetchAllFromTable('mission_logs'),
-        fetchAllFromTable('inventory_status'),
-        fetchAllFromTable('picking_orders')
-      ]);
-
-      console.log("Supabase fetch successful:", {
-        planRowsCount: planRows.length,
-        missionRowsCount: missionRows.length,
-        inventoryRowsCount: inventoryRows.length,
-        pickingRowsCount: pickingRows.length
-      });
-
-      const rawDatasets = { rackRows, planRows, missionRows, inventoryRows, pickingRows };
-      const processed = processRawDatasets(rawDatasets);
-      return { ...processed, rawDatasets, dataSource: 'supabase' };
+      return await fetchSupabaseData();
     } catch (err) {
       console.warn("Supabase fetch failed. Falling back to local Excel files:", err);
     }
   }
-
-  // Fallback to local files
-  try {
-    console.log("Loading data from local Excel files...");
-    const rackRes = await fetch('/Rack_20260720_수정.xlsx');
-    const rackBlob = await rackRes.arrayBuffer();
-    const wbRack = XLSX.read(rackBlob, { type: 'array' });
-    const rackRows = XLSX.utils.sheet_to_json(wbRack.Sheets[wbRack.SheetNames[0]]);
-
-    const dataRes = await fetch('/창고데이터_수정.xlsx');
-    const dataBlob = await dataRes.arrayBuffer();
-    const wbData = XLSX.read(dataBlob, { type: 'array' });
-
-    const planRows = XLSX.utils.sheet_to_json(wbData.Sheets['배치계획'] || wbData.Sheets[wbData.SheetNames[0]]);
-    const missionRows = XLSX.utils.sheet_to_json(wbData.Sheets['미션로그'] || wbData.Sheets[wbData.SheetNames[1]]);
-    const inventoryRows = XLSX.utils.sheet_to_json(wbData.Sheets['재고현황'] || wbData.Sheets[wbData.SheetNames[2]]);
-    const pickingRows = XLSX.utils.sheet_to_json(wbData.Sheets['피킹오더'] || wbData.Sheets[wbData.SheetNames[3]]);
-
-    const rawDatasets = { rackRows, planRows, missionRows, inventoryRows, pickingRows };
-    const processed = processRawDatasets(rawDatasets);
-    return { ...processed, rawDatasets, dataSource: 'excel' };
-  } catch (err) {
-    console.error("Data loading error, fallback to fallback data mode:", err);
-    throw err;
-  }
+  return await fetchExcelData();
 }
 
 export const parseDateValue = (raw) => {

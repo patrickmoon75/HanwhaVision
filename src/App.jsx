@@ -6,7 +6,7 @@ import DailyDefenseReportView from './components/DailyDefenseReportView';
 import SlottingSimulatorModal from './components/SlottingSimulatorModal';
 import ExceptionAlertBanner from './components/ExceptionAlertBanner';
 import PlannerSimulatorView from './components/PlannerSimulatorView';
-import { loadAndProcessData, processRawDatasets } from './services/dataProcessor';
+import { loadAndProcessData, processRawDatasets, fetchSupabaseData, fetchExcelData } from './services/dataProcessor';
 import * as XLSX from 'xlsx';
 import { Upload, Sparkles } from 'lucide-react';
 import './styles/dashboard.css';
@@ -146,6 +146,72 @@ export default function App() {
     }
   };
 
+  // DB 실시간 연동
+  const handleConnectDB = async () => {
+    setLoading(true);
+    try {
+      const result = await fetchSupabaseData();
+      setData(result);
+      if (result.rawDatasets) {
+        setRawDatasets(result.rawDatasets);
+      }
+      if (result.pickingRows) setSimPickingRows(result.pickingRows);
+      if (result.yardIds) setSimYardIds(result.yardIds);
+      if (result.dates && result.dates.length > 0) {
+        setSelectedDate(result.dates.includes('2026-06-29') ? '2026-06-29' : result.dates[0]);
+        setStartDate(result.dates[0]);
+        setEndDate(result.dates[result.dates.length - 1]);
+      }
+      setInventoryFileInfo({
+        name: 'Supabase Database',
+        path: 'Live Database Connection: Rest API ( resolution=merge-duplicates )',
+        isDefault: false
+      });
+      setRackFileInfo({
+        name: 'Rack_20260720_수정.xlsx',
+        path: DEFAULT_RACK_PATH,
+        isDefault: true
+      });
+    } catch (err) {
+      alert("DB 연결 실패:\n" + err.message + "\n\n환경 변수(VITE_SUPABASE_URL, VITE_SUPABASE_ANON_KEY) 설정을 확인해 주세요.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 로컬 엑셀 데이터 연동
+  const handleConnectExcel = async () => {
+    setLoading(true);
+    try {
+      const result = await fetchExcelData();
+      setData(result);
+      if (result.rawDatasets) {
+        setRawDatasets(result.rawDatasets);
+      }
+      if (result.pickingRows) setSimPickingRows(result.pickingRows);
+      if (result.yardIds) setSimYardIds(result.yardIds);
+      if (result.dates && result.dates.length > 0) {
+        setSelectedDate(result.dates.includes('2026-06-29') ? '2026-06-29' : result.dates[0]);
+        setStartDate(result.dates[0]);
+        setEndDate(result.dates[result.dates.length - 1]);
+      }
+      setRackFileInfo({
+        name: 'Rack_20260720_수정.xlsx',
+        path: DEFAULT_RACK_PATH,
+        isDefault: true
+      });
+      setInventoryFileInfo({
+        name: '창고데이터_수정.xlsx',
+        path: DEFAULT_INVENTORY_PATH,
+        isDefault: true
+      });
+    } catch (err) {
+      alert("엑셀 데이터 로드 실패: " + err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // Drag & Drop / 통합 파일 업로드 파싱
   const handleDrop = async (e) => {
     e.preventDefault();
@@ -279,6 +345,8 @@ export default function App() {
         onReplaceRackFile={handleReplaceRackFile}
         onReplaceInventoryFile={handleReplaceInventoryFile}
         dataSource={data.dataSource || 'excel'}
+        onConnectDB={handleConnectDB}
+        onConnectExcel={handleConnectExcel}
       />
 
       {/* 2. RWCS Exception Alert Banner (Filtered by Date Range) */}

@@ -11,7 +11,9 @@ export default function HeaderMasterKPI({
   inventoryFileInfo,
   onReplaceRackFile,
   onReplaceInventoryFile,
-  dataSource
+  dataSource,
+  onConnectDB,
+  onConnectExcel
 }) {
   if (!masterKPI) return null;
 
@@ -61,36 +63,99 @@ export default function HeaderMasterKPI({
 
       {/* File Status & Source File Switcher Bar */}
       <div className="file-status-bar-container">
-        <div className="file-status-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+        <div className="file-status-title" style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%', flexWrap: 'wrap', gap: '8px' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            {dataSource === 'supabase' ? <Database size={16} color="#10b981" /> : <FileCheck size={16} color="var(--accent-cyan)" />}
-            <span>현재 데이터소스: {dataSource === 'supabase' ? 'Supabase Database (실시간 연동)' : '로컬 엑셀 파일 정보'}</span>
+            {dataSource === 'supabase' ? <Database size={16} color="#10b981" /> : <FileSpreadsheet size={16} color="var(--accent-cyan)" />}
+            <span style={{ fontSize: '0.85rem' }}>현재 데이터소스: <strong style={{ color: dataSource === 'supabase' ? '#10b981' : 'var(--accent-cyan)' }}>{dataSource === 'supabase' ? 'Supabase Database (실시간 연동)' : '로컬 엑셀 파일 정보'}</strong></span>
           </div>
-          {dataSource === 'supabase' && (
-            <span style={{ 
-              display: 'inline-flex', 
-              alignItems: 'center', 
-              gap: '6px', 
-              background: 'rgba(16, 185, 129, 0.15)', 
-              color: '#10b981', 
-              padding: '4px 10px', 
-              borderRadius: '12px', 
-              fontSize: '0.75rem', 
-              fontWeight: 'bold',
-              border: '1px solid rgba(16, 185, 129, 0.3)',
-              boxShadow: '0 0 8px rgba(16,185,129,0.1)'
-            }}>
-              <span style={{ 
-                width: '6px', 
-                height: '6px', 
-                backgroundColor: '#10b981', 
-                borderRadius: '50%', 
-                display: 'inline-block',
-                boxShadow: '0 0 4px #10b981'
-              }}></span>
-              LIVE CONNECTED
-            </span>
-          )}
+          
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            {dataSource === 'supabase' ? (
+              <>
+                <span style={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  background: 'rgba(16, 185, 129, 0.15)', 
+                  color: '#10b981', 
+                  padding: '4px 10px', 
+                  borderRadius: '12px', 
+                  fontSize: '0.75rem', 
+                  fontWeight: 'bold',
+                  border: '1px solid rgba(16, 185, 129, 0.3)',
+                  boxShadow: '0 0 8px rgba(16,185,129,0.1)'
+                }}>
+                  <span style={{ 
+                    width: '6px', 
+                    height: '6px', 
+                    backgroundColor: '#10b981', 
+                    borderRadius: '50%', 
+                    display: 'inline-block',
+                    boxShadow: '0 0 4px #10b981'
+                  }}></span>
+                  DB 연결됨
+                </span>
+                <button 
+                  onClick={onConnectExcel} 
+                  className="btn-secondary" 
+                  style={{ 
+                    padding: '4px 10px', 
+                    fontSize: '0.75rem', 
+                    borderRadius: '8px',
+                    borderColor: 'rgba(0, 242, 254, 0.3)',
+                    height: '26px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px'
+                  }}
+                >
+                  <FileSpreadsheet size={12} />
+                  로컬 엑셀로 전환
+                </button>
+              </>
+            ) : (
+              <>
+                <span style={{ 
+                  display: 'inline-flex', 
+                  alignItems: 'center', 
+                  gap: '6px', 
+                  background: 'rgba(0, 242, 254, 0.1)', 
+                  color: 'var(--accent-cyan)', 
+                  padding: '4px 10px', 
+                  borderRadius: '12px', 
+                  fontSize: '0.75rem', 
+                  fontWeight: 'bold',
+                  border: '1px solid rgba(0, 242, 254, 0.2)'
+                }}>
+                  엑셀 모드
+                </span>
+                <button 
+                  onClick={onConnectDB} 
+                  className="btn-primary" 
+                  style={{ 
+                    padding: '4px 10px', 
+                    fontSize: '0.75rem', 
+                    borderRadius: '8px',
+                    color: '#0b0f19',
+                    background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                    boxShadow: '0 2px 8px rgba(16, 185, 129, 0.2)',
+                    border: 'none',
+                    cursor: 'pointer',
+                    height: '26px',
+                    display: 'inline-flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '4px',
+                    transition: 'all 0.2s'
+                  }}
+                >
+                  <Database size={12} />
+                  Supabase DB 연결
+                </button>
+              </>
+            )}
+          </div>
         </div>
         <div className="file-status-grid">
           {/* Rack File Info Chip */}
