@@ -13,7 +13,9 @@ export default function HeaderMasterKPI({
   onReplaceInventoryFile,
   dataSource,
   onConnectDB,
-  onConnectExcel
+  onConnectExcel,
+  activeView,
+  onChangeView
 }) {
   if (!masterKPI) return null;
 
@@ -58,6 +60,18 @@ export default function HeaderMasterKPI({
             <Cpu size={18} />
             슬로팅 보정 시뮬레이터
           </button>
+
+          {activeView === 'analytics' ? (
+            <button className="btn-secondary" onClick={() => onChangeView('wms_do')} style={{ border: '1px solid var(--accent-cyan)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Database size={18} color="var(--accent-cyan)" />
+              WMS 수집 제어판
+            </button>
+          ) : (
+            <button className="btn-secondary" onClick={() => onChangeView('analytics')} style={{ border: '1px solid var(--accent-blue)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <Cpu size={18} color="var(--accent-blue)" />
+              운영 분석 대시보드
+            </button>
+          )}
         </div>
       </div>
 

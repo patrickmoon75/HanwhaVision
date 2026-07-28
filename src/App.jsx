@@ -6,6 +6,7 @@ import DailyDefenseReportView from './components/DailyDefenseReportView';
 import SlottingSimulatorModal from './components/SlottingSimulatorModal';
 import ExceptionAlertBanner from './components/ExceptionAlertBanner';
 import PlannerSimulatorView from './components/PlannerSimulatorView';
+import WmsDoReceiverView from './components/WmsDoReceiverView';
 import { loadAndProcessData, processRawDatasets, fetchSupabaseData, fetchExcelData } from './services/dataProcessor';
 import * as XLSX from 'xlsx';
 import { Upload, Sparkles } from 'lucide-react';
@@ -15,6 +16,7 @@ const DEFAULT_RACK_PATH = 'c:\\Users\\bosel\\Desktop\\한화비전 분석 프로
 const DEFAULT_INVENTORY_PATH = 'c:\\Users\\bosel\\Desktop\\한화비전 분석 프로그램\\창고데이터_수정.xlsx';
 
 export default function App() {
+  const [activeView, setActiveView] = useState('analytics'); // 'analytics' or 'wms_do'
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState('2026-06-29');
@@ -347,59 +349,67 @@ export default function App() {
         dataSource={data.dataSource || 'excel'}
         onConnectDB={handleConnectDB}
         onConnectExcel={handleConnectExcel}
+        activeView={activeView}
+        onChangeView={setActiveView}
       />
 
-      {/* 2. RWCS Exception Alert Banner (Filtered by Date Range) */}
-      <ExceptionAlertBanner 
-        invalidMissions={filteredInvalidMissions} 
-        startDate={startDate}
-        endDate={endDate}
-      />
+      {activeView === 'analytics' ? (
+        <>
+          {/* 2. RWCS Exception Alert Banner (Filtered by Date Range) */}
+          <ExceptionAlertBanner 
+            invalidMissions={filteredInvalidMissions} 
+            startDate={startDate}
+            endDate={endDate}
+          />
 
-      {/* 3. Top Trend View */}
-      <PickingTrendView
-        dates={data.dates}
-        dailyAnalytics={data.dailyAnalytics}
-        selectedDate={selectedDate}
-        onSelectDate={setSelectedDate}
-        startDate={startDate}
-        endDate={endDate}
-        onRangeChange={(s, e) => {
-          setStartDate(s);
-          setEndDate(e);
-        }}
-      />
+          {/* 3. Top Trend View */}
+          <PickingTrendView
+            dates={data.dates}
+            dailyAnalytics={data.dailyAnalytics}
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+            startDate={startDate}
+            endDate={endDate}
+            onRangeChange={(s, e) => {
+              setStartDate(s);
+              setEndDate(e);
+            }}
+          />
 
-      {/* 4. Middle Root Cause Isolation View */}
-      <RootCauseIsolationView
-        selectedDate={selectedDate}
-        dateInfo={currentDateInfo}
-      />
+          {/* 4. Middle Root Cause Isolation View */}
+          <RootCauseIsolationView
+            selectedDate={selectedDate}
+            dateInfo={currentDateInfo}
+          />
 
-      {/* 5. Bottom Daily Defense Report */}
-      <DailyDefenseReportView
-        selectedDate={selectedDate}
-        dateInfo={currentDateInfo}
-      />
+          {/* 5. Bottom Daily Defense Report */}
+          <DailyDefenseReportView
+            selectedDate={selectedDate}
+            dateInfo={currentDateInfo}
+          />
 
-      {/* 6. Planner 배치계획 시뮬레이터 */}
-      <PlannerSimulatorView
-        pickingRows={simPickingRows}
-        yardIds={simYardIds}
-        dates={data.dates}
-        dailyAnalytics={data.dailyAnalytics}
-        selectedDate={selectedDate}
-        onSelectDate={setSelectedDate}
-        startDate={startDate}
-        endDate={endDate}
-        onRangeChange={(s, e) => {
-          setStartDate(s);
-          setEndDate(e);
-        }}
-        inventoryRows={rawDatasets.inventoryRows}
-        rackRows={rawDatasets.rackRows}
-        planRows={rawDatasets.planRows}
-      />
+          {/* 6. Planner 배치계획 시뮬레이터 */}
+          <PlannerSimulatorView
+            pickingRows={simPickingRows}
+            yardIds={simYardIds}
+            dates={data.dates}
+            dailyAnalytics={data.dailyAnalytics}
+            selectedDate={selectedDate}
+            onSelectDate={setSelectedDate}
+            startDate={startDate}
+            endDate={endDate}
+            onRangeChange={(s, e) => {
+              setStartDate(s);
+              setEndDate(e);
+            }}
+            inventoryRows={rawDatasets.inventoryRows}
+            rackRows={rawDatasets.rackRows}
+            planRows={rawDatasets.planRows}
+          />
+        </>
+      ) : (
+        <WmsDoReceiverView />
+      )}
 
       {/* 7. Slotting Engine Feedback Simulator Modal */}
       <SlottingSimulatorModal
