@@ -34,7 +34,7 @@ export default function HeaderMasterKPI({
           <div>
             <h1 className="brand-title">RWCS Analytics & Simulator</h1>
             <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '2px' }}>
-              한화비전 대고객 방어용 운영 분석 및 물리 인프라 제약 격리(Isolation) 시스템
+              한화비전 운영 분석 및 시뮬레이션 시스템
             </p>
           </div>
         </div>
