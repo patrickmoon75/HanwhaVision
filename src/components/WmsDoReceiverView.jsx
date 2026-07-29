@@ -189,9 +189,11 @@ export default function WmsDoReceiverView() {
       alert("Supabase 연결 설정이 완료되지 않았습니다.");
       return;
     }
-    if (!serviceRoleKey) {
-      alert("Edge Function 호출을 위해 우측 상단의 API 설정을 통해 Service Role Key를 입력해 주세요.");
-      setIsConfigOpen(true);
+    
+    // Fallback to Anon Key if Service Role Key is not entered by user
+    const activeApiKey = serviceRoleKey || import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!activeApiKey) {
+      alert("API Key가 누락되었습니다. 설정을 확인해 주세요.");
       return;
     }
 
@@ -206,13 +208,13 @@ export default function WmsDoReceiverView() {
     log(">> Supabase Edge Function 접속 중...", 'info');
     const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
     log(`>> Endpoint: ${supabaseUrl}/functions/v1/fetch-wms-orders`);
-    log(">> Authorization: Bearer Service_Role_Key");
+    log(">> Authorization: Bearer Active_API_Key");
 
     try {
       const res = await fetch(`${supabaseUrl}/functions/v1/fetch-wms-orders`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${serviceRoleKey}`,
+          'Authorization': `Bearer ${activeApiKey}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({})
@@ -252,9 +254,11 @@ export default function WmsDoReceiverView() {
       alert("먼저 Supabase 프로젝트가 연결되어야 합니다.");
       return;
     }
-    if (!serviceRoleKey) {
-      alert("스케줄을 변경하기 위해서는 우측 상단의 API 설정을 통해 Service Role Key를 필수로 입력해야 합니다.");
-      setIsConfigOpen(true);
+    
+    // Fallback to Anon Key if Service Role Key is not entered by user
+    const activeApiKey = serviceRoleKey || import.meta.env.VITE_SUPABASE_ANON_KEY;
+    if (!activeApiKey) {
+      alert("API Key가 누락되었습니다. 설정을 확인해 주세요.");
       return;
     }
 
@@ -275,7 +279,7 @@ export default function WmsDoReceiverView() {
       const { data, error } = await supabase.rpc('update_wms_cron_schedule', {
         cron_expr: cronExpr,
         project_ref: projectRef,
-        service_role_key: serviceRoleKey
+        service_role_key: activeApiKey
       });
 
       if (error) throw error;
@@ -349,7 +353,7 @@ export default function WmsDoReceiverView() {
           </div>
           <div style={{ flexGrow: 1, display: 'flex', flexDirection: 'column', gap: '16px' }}>
             <p style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', lineHeight: 1.5 }}>
-              자동 수집 스케줄 설정(pg_cron RPC) 및 실시간 즉시 수집(Edge Function 호출)을 작동하려면 **Service Role Key**가 필요합니다. 이 비밀 키는 외부로 유출되지 않으며, 오직 브라우저의 로컬 보안 저장소(`localStorage`)에만 저장됩니다.
+              기본적으로 시스템에 탑재된 API Key(Anon Key)를 사용하여 자동 수집 스케줄 설정 및 즉시 수집을 실행합니다. 특정 관리 권한(Service Role Key)이 필요하거나 변경을 원하실 때만 입력해 주세요. 입력하지 않으면 기본 키가 사용됩니다.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
               <label style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>Supabase Service Role Key (비밀키)</label>
