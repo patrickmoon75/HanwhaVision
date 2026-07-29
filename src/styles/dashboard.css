@@ -525,3 +525,9 @@ h1, h2, h3, h4, .brand-title {
   transform: translateY(-1px);
 }
 
+/* Custom Time Picker Webkit Calendar Indicator color */
+input[type="time"]::-webkit-calendar-picker-indicator {
+  filter: invert(1) brightness(100%);
+  cursor: pointer;
+}
+
