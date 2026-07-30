@@ -366,6 +366,7 @@ export default function App() {
           <PickingTrendView
             dates={data.dates}
             dailyAnalytics={data.dailyAnalytics}
+            rawDatasets={rawDatasets}
             selectedDate={selectedDate}
             onSelectDate={setSelectedDate}
             startDate={startDate}

@@ -125,6 +125,74 @@ export const parseDateValue = (raw) => {
   return str;
 };
 
+// 4가지 데이터셋(배치계획, 미션로그, 재고현황, 피킹오더)의 날짜별 존재 세트(Set) 추출
+export function extractDataAvailabilitySets(rawDatasets = {}) {
+  const { planRows = [], missionRows = [], inventoryRows = [], pickingRows = [] } = rawDatasets;
+
+  const planDatesSet = new Set();
+  const missionDatesSet = new Set();
+  const inventoryDatesSet = new Set();
+  const pickingDatesSet = new Set();
+
+  // 1. 배치계획: PlanId에서 첫번째 영문자 뒤 8자리가 연월일
+  planRows.forEach(p => {
+    const planIdStr = String(p.PlanId || p.planId || p.PLAN_ID || '').trim();
+    if (!planIdStr) return;
+    const match = planIdStr.match(/[A-Za-z](\d{4})(\d{2})(\d{2})/);
+    if (match) {
+      planDatesSet.add(`${match[1]}-${match[2]}-${match[3]}`);
+    }
+  });
+
+  // 2. 미션로그: CreateTime에서 연월일
+  missionRows.forEach(m => {
+    const rawTime = m.CreateTime || m.createTime || m.StartTime || m.startTime || '';
+    if (!rawTime) return;
+    const dateStr = parseDateValue(rawTime);
+    if (dateStr && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      missionDatesSet.add(dateStr);
+    }
+  });
+
+  // 3. 재고현황: Date에 날짜 (연도 생략 시 2026년 처리)
+  inventoryRows.forEach(i => {
+    const rawDate = i.Date ?? i.date ?? i.SnapshotDate ?? i.snapshotDate ?? '';
+    if (rawDate === undefined || rawDate === null || rawDate === '') return;
+    let parsed = parseDateValue(rawDate);
+    if (parsed) {
+      if (parsed.match(/^\d{4}-\d{2}-\d{2}$/)) {
+        inventoryDatesSet.add(parsed);
+      } else {
+        const cleaned = String(parsed).replace(/\//g, '-').trim();
+        const parts = cleaned.split('-');
+        if (parts.length === 2) {
+          const mm = parts[0].padStart(2, '0');
+          const dd = parts[1].padStart(2, '0');
+          inventoryDatesSet.add(`2026-${mm}-${dd}`);
+        }
+      }
+    }
+  });
+
+  // 4. 피킹오더: ReceiveTime에 연월일
+  pickingRows.forEach(p => {
+    const rawTime = p.ReceiveTime || p.receiveTime || p.Receive_Time || '';
+    if (!rawTime) return;
+    const dateStr = parseDateValue(rawTime);
+    if (dateStr && dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) {
+      pickingDatesSet.add(dateStr);
+    }
+  });
+
+  return {
+    planDatesSet,
+    missionDatesSet,
+    inventoryDatesSet,
+    pickingDatesSet
+  };
+}
+
+
 export function processRawDatasets({ rackRows, planRows, missionRows, inventoryRows, pickingRows }) {
   // 1. Physical Master KPI
   const yardRacks = rackRows.filter(r => r.RackType === 'Yard');

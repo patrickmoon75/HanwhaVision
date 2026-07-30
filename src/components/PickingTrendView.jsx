@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, LabelList, ReferenceLine } from 'recharts';
-import { TrendingDown, MousePointerClick, Info, Calendar } from 'lucide-react';
+import { TrendingDown, MousePointerClick, Info, Calendar, Database, CheckCircle2, XCircle, FileSpreadsheet } from 'lucide-react';
+import { extractDataAvailabilitySets } from '../services/dataProcessor';
 
 export default function PickingTrendView({ 
   dates = [], 
   dailyAnalytics = {}, 
+  rawDatasets = {},
   selectedDate, 
   onSelectDate,
   startDate: parentStart,
@@ -57,6 +59,11 @@ export default function PickingTrendView({
     const end = endDate || dates[dates.length - 1];
     return d >= start && d <= end;
   });
+
+  // 4가지 데이터셋(배치계획, 미션로그, 재고현황, 피킹오더) 존재 여부 세트
+  const availabilitySets = useMemo(() => {
+    return extractDataAvailabilitySets(rawDatasets);
+  }, [rawDatasets]);
 
   const chartData = filteredDates.map(d => {
     const info = dailyAnalytics[d] || {};
@@ -345,6 +352,145 @@ export default function PickingTrendView({
           </div>
         </div>
       </div>
+
+      {/* 날짜별 4가지 수집 데이터 연동/존재 현황 표 (Data Availability Matrix) */}
+      <div style={{
+        margin: '12px 0 16px 0',
+        background: 'rgba(15, 23, 42, 0.65)',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
+        borderRadius: '10px',
+        padding: '12px 14px'
+      }}>
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          justify: 'space-between',
+          marginBottom: '8px',
+          fontSize: '0.82rem',
+          color: 'var(--text-secondary)',
+          flexWrap: 'wrap',
+          gap: '8px'
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontWeight: 600, color: '#f3f4f6' }}>
+            <Database size={15} color="var(--accent-cyan)" />
+            <span>일자별 수집 데이터 연동 현황</span>
+            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', fontWeight: 400 }}>
+              (배치계획, 미션로그, 재고현황, 피킹오더 존재 여부)
+            </span>
+          </div>
+          <div style={{ display: 'flex', gap: '12px', fontSize: '0.75rem' }}>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#10b981' }}>
+              <CheckCircle2 size={13} /> 존재 (O)
+            </span>
+            <span style={{ display: 'flex', alignItems: 'center', gap: '4px', color: '#f87171' }}>
+              <XCircle size={13} /> 미존재 (X)
+            </span>
+          </div>
+        </div>
+
+        <div style={{ overflowX: 'auto', borderRadius: '6px', border: '1px solid rgba(255,255,255,0.06)' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.78rem', textAlign: 'center', whiteSpace: 'nowrap' }}>
+            <thead>
+              <tr style={{ background: 'rgba(255, 255, 255, 0.04)', color: 'var(--text-muted)' }}>
+                <th style={{ padding: '6px 10px', textAlign: 'left', minWidth: '90px', borderBottom: '1px solid rgba(255,255,255,0.08)', position: 'sticky', left: 0, background: '#111827', zIndex: 2 }}>
+                  데이터 항목
+                </th>
+                {filteredDates.map(d => {
+                  const isSel = d === selectedDate;
+                  return (
+                    <th 
+                      key={`head-${d}`} 
+                      onClick={() => onSelectDate && onSelectDate(d)}
+                      style={{
+                        padding: '6px 8px',
+                        borderBottom: '1px solid rgba(255,255,255,0.08)',
+                        cursor: 'pointer',
+                        color: isSel ? '#00f2fe' : 'var(--text-secondary)',
+                        fontWeight: isSel ? 700 : 500,
+                        background: isSel ? 'rgba(0, 242, 254, 0.12)' : 'transparent',
+                        transition: 'all 0.2s'
+                      }}
+                      title="클릭 시 이 날짜로 상세 분석 선택"
+                    >
+                      {d.slice(5)}
+                    </th>
+                  );
+                })}
+              </tr>
+            </thead>
+            <tbody>
+              {[
+                { key: 'plan', label: '배치계획', set: availabilitySets.planDatesSet, tooltip: 'PlanId의 첫 영문자 뒤 8자리 기준' },
+                { key: 'mission', label: '미션로그', set: availabilitySets.missionDatesSet, tooltip: 'CreateTime/StartTime 기준' },
+                { key: 'inventory', label: '재고현황', set: availabilitySets.inventoryDatesSet, tooltip: 'Date 필드 기준' },
+                { key: 'picking', label: '피킹오더', set: availabilitySets.pickingDatesSet, tooltip: 'ReceiveTime 기준' }
+              ].map((row, rIdx) => (
+                <tr key={row.key} style={{ borderBottom: rIdx < 3 ? '1px solid rgba(255,255,255,0.04)' : 'none' }}>
+                  <td style={{
+                    padding: '6px 10px',
+                    textAlign: 'left',
+                    fontWeight: 600,
+                    color: '#e2e8f0',
+                    position: 'sticky',
+                    left: 0,
+                    background: '#111827',
+                    borderRight: '1px solid rgba(255,255,255,0.08)',
+                    zIndex: 2
+                  }} title={row.tooltip}>
+                    {row.label}
+                  </td>
+                  {filteredDates.map(d => {
+                    const hasData = row.set.has(d);
+                    const isSel = d === selectedDate;
+                    return (
+                      <td
+                        key={`${row.key}-${d}`}
+                        onClick={() => onSelectDate && onSelectDate(d)}
+                        style={{
+                          padding: '5px 8px',
+                          background: isSel 
+                            ? (hasData ? 'rgba(16, 185, 129, 0.15)' : 'rgba(239, 68, 68, 0.12)')
+                            : 'transparent',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        {hasData ? (
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            background: 'rgba(16, 185, 129, 0.18)',
+                            color: '#10b981',
+                            border: '1px solid rgba(16, 185, 129, 0.35)'
+                          }}>
+                            O
+                          </span>
+                        ) : (
+                          <span style={{
+                            display: 'inline-block',
+                            padding: '1px 6px',
+                            borderRadius: '4px',
+                            fontSize: '0.72rem',
+                            fontWeight: 700,
+                            background: 'rgba(239, 68, 68, 0.12)',
+                            color: '#f87171',
+                            border: '1px solid rgba(239, 68, 68, 0.25)'
+                          }}>
+                            X
+                          </span>
+                        )}
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '4px', fontSize: '0.8rem', color: 'var(--accent-cyan)' }}>
         <MousePointerClick size={15} style={{ marginRight: '4px' }} />
