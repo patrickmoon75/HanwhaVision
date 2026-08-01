@@ -1,6 +1,6 @@
 import React from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
-import { PieChart as PieIcon, AlertOctagon, ShieldCheck, BarChart2, CheckCircle2 } from 'lucide-react';
+import { PieChart as PieIcon, AlertOctagon, ShieldCheck, BarChart2 } from 'lucide-react';
 
 export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
   if (!dateInfo) return null;
@@ -411,15 +411,7 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
           </div>
         </div>
 
-        <div style={{ background: 'rgba(0, 230, 118, 0.08)', border: '1px solid rgba(0, 230, 118, 0.2)', padding: '12px', borderRadius: '10px', marginTop: '12px' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--accent-green)', fontWeight: 700, fontSize: '0.85rem' }}>
-            <CheckCircle2 size={16} />
-            <span>실시간 복구 제어(Fallback) 입증</span>
-          </div>
-          <p style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', lineHeight: 1.5 }}>
-            에러(Aborted) 발생 시 RWCS가 차선순위 미션을 자동 배치하여 밤새 야드를 상시 <strong style={{ color: 'var(--accent-green)' }}>{(dateInfo.prevYardOccupancyRate === null || dateInfo.prevYardOccupancyRate === undefined) ? '데이터 없음' : `${dateInfo.prevYardOccupancyRate}%`}</strong> 수준의 만재 상태로 유지했습니다. 피킹율 하락은 가동률 부실이 아닙니다.
-          </p>
-        </div>
+
       </div>
     </div>
   );
