@@ -13,7 +13,7 @@ import { Upload, Sparkles } from 'lucide-react';
 import './styles/dashboard.css';
 
 const DEFAULT_RACK_PATH = 'c:\\Users\\bosel\\Desktop\\한화비전 분석 프로그램\\Rack_20260720_수정.xlsx';
-const DEFAULT_INVENTORY_PATH = 'c:\\Users\\bosel\\Desktop\\한화비전 분석 프로그램\\창고데이터_수정.xlsx';
+const DEFAULT_INVENTORY_PATH = 'c:\\Users\\bosel\\Desktop\\한화비전 분석 프로그램\\★창고데이터(분석용).xlsx';
 
 export default function App() {
   const [activeView, setActiveView] = useState('analytics'); // 'analytics' or 'wms_do'
@@ -34,7 +34,7 @@ export default function App() {
   });
 
   const [inventoryFileInfo, setInventoryFileInfo] = useState({
-    name: '창고데이터_수정.xlsx',
+    name: '★창고데이터(분석용).xlsx',
     path: DEFAULT_INVENTORY_PATH,
     isDefault: true
   });
@@ -203,7 +203,7 @@ export default function App() {
         isDefault: true
       });
       setInventoryFileInfo({
-        name: '창고데이터_수정.xlsx',
+        name: '★창고데이터(분석용).xlsx',
         path: DEFAULT_INVENTORY_PATH,
         isDefault: true
       });
@@ -232,6 +232,7 @@ export default function App() {
       let missionRows = rawDatasets.missionRows;
       let inventoryRows = rawDatasets.inventoryRows;
       let pickingRows = rawDatasets.pickingRows;
+      let pendingOrderRows = rawDatasets.pendingOrderRows || [];
 
       let updatedRackFile = rackFileInfo;
       let updatedInventoryFile = inventoryFileInfo;
@@ -252,6 +253,12 @@ export default function App() {
           if (wb.Sheets['미션로그']) missionRows = XLSX.utils.sheet_to_json(wb.Sheets['미션로그']);
           if (wb.Sheets['재고현황']) inventoryRows = XLSX.utils.sheet_to_json(wb.Sheets['재고현황']);
           if (wb.Sheets['피킹오더']) pickingRows = XLSX.utils.sheet_to_json(wb.Sheets['피킹오더']);
+          
+          const pendingSheet = wb.Sheets['미출고DO'] || wb.Sheets['미출고오더'] || wb.Sheets['PendingDO'] || wb.Sheets['PendingOrders'] || wb.Sheets['pending_orders'] || wb.Sheets['미출고_DO'];
+          if (pendingSheet) {
+            pendingOrderRows = XLSX.utils.sheet_to_json(pendingSheet);
+          }
+
           updatedInventoryFile = {
             name: file.name,
             path: file.path || file.name,
@@ -260,7 +267,7 @@ export default function App() {
         }
       }
 
-      const newRaw = { rackRows, planRows, missionRows, inventoryRows, pickingRows };
+      const newRaw = { rackRows, planRows, missionRows, inventoryRows, pickingRows, pendingOrderRows };
       setRawDatasets(newRaw);
 
       const result = processRawDatasets(newRaw);
@@ -406,6 +413,8 @@ export default function App() {
             inventoryRows={rawDatasets.inventoryRows}
             rackRows={rawDatasets.rackRows}
             planRows={rawDatasets.planRows}
+            rawDatasets={rawDatasets}
+            pendingOrderRows={rawDatasets.pendingOrderRows}
           />
         </>
       ) : (

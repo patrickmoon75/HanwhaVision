@@ -39,6 +39,8 @@ export default function PickingTrendView({
     D: false,
     E: false
   });
+  const [showPickingRateLine, setShowPickingRateLine] = useState(true);
+  const [showMissionCountLine, setShowMissionCountLine] = useState(true);
   const [hoveredLine, setHoveredLine] = useState(null);
 
   const toggleMetric = (key) => {
@@ -521,89 +523,95 @@ export default function PickingTrendView({
               unit="건"
             />
             <Tooltip content={<CustomTooltip />} />
-            <ReferenceLine 
-              y={Number(periodAvgRate)} 
-              stroke="#00f2fe" 
-              strokeDasharray="5 5" 
-              strokeWidth={2}
-              label={{ 
-                value: `기간 평균: ${periodAvgRate}%`, 
-                fill: '#00f2fe', 
-                fontSize: 12, 
-                fontWeight: 700, 
-                position: 'insideTopRight',
-                dy: -12
-              }} 
-            />
-            <Line
-              type="monotone"
-              dataKey="pickingRate"
-              connectNulls={true}
-              stroke="url(#lineGradient)"
-              strokeWidth={3}
-              onMouseEnter={() => setHoveredLine('pickingRate')}
-              dot={(props) => {
-                const { cx, cy, payload } = props;
-                if (!payload || payload.pickingRate === null || cx === undefined || cy === undefined) return null;
-                const isSel = payload.fullDate === selectedDate;
-                const isDrop = payload.fullDate === '2026-06-29';
-                return (
-                  <circle
-                    key={payload.fullDate}
-                    cx={cx}
-                    cy={cy}
-                    r={isSel ? 7 : isDrop ? 6 : 4}
-                    fill={isSel ? '#00f2fe' : isDrop ? '#ff0844' : '#4facfe'}
-                    stroke={isSel ? '#ffffff' : '#000000'}
-                    strokeWidth={isSel ? 3 : 1}
-                    style={{ cursor: 'pointer' }}
-                    onMouseEnter={(e) => {
-                      e.stopPropagation();
-                      setHoveredLine('pickingRate');
-                    }}
-                  />
-                );
-              }}
-              activeDot={(props) => {
-                const { payload } = props;
-                if (!payload || payload.pickingRate === null) return null;
-                return <circle {...props} r={9} fill="#00f2fe" />;
-              }}
-            >
-              <LabelList content={<CustomLabel />} />
-              <LabelList content={<CustomSubLabel />} />
-            </Line>
-            <Line
-              yAxisId="right"
-              type="monotone"
-              dataKey="completedCount"
-              stroke="#10b981"
-              strokeWidth={2.5}
-              onMouseEnter={() => setHoveredLine('completedCount')}
-              dot={(props) => {
-                const { cx, cy, payload } = props;
-                const isSel = payload.fullDate === selectedDate;
-                return (
-                  <circle
-                    key={`comp-${payload.fullDate}`}
-                    cx={cx}
-                    cy={cy}
-                    r={isSel ? 6 : 4}
-                    fill="#10b981"
-                    stroke={isSel ? '#ffffff' : '#000000'}
-                    strokeWidth={isSel ? 2 : 1}
-                    style={{ cursor: 'pointer' }}
-                    onMouseEnter={(e) => {
-                      e.stopPropagation();
-                      setHoveredLine('completedCount');
-                    }}
-                  />
-                );
-              }}
-              activeDot={{ r: 8, fill: '#10b981' }}
-            >
-              <LabelList content={<CustomMissionLabel />} />
-            </Line>
+            {showPickingRateLine && (
+              <ReferenceLine 
+                y={Number(periodAvgRate)} 
+                stroke="#00f2fe" 
+                strokeDasharray="5 5" 
+                strokeWidth={2}
+                label={{ 
+                  value: `기간 평균: ${periodAvgRate}%`, 
+                  fill: '#00f2fe', 
+                  fontSize: 12, 
+                  fontWeight: 700, 
+                  position: 'insideTopRight',
+                  dy: -12
+                }} 
+              />
+            )}
+            {showPickingRateLine && (
+              <Line
+                type="monotone"
+                dataKey="pickingRate"
+                connectNulls={true}
+                stroke="url(#lineGradient)"
+                strokeWidth={3}
+                onMouseEnter={() => setHoveredLine('pickingRate')}
+                dot={(props) => {
+                  const { cx, cy, payload } = props;
+                  if (!payload || payload.pickingRate === null || cx === undefined || cy === undefined) return null;
+                  const isSel = payload.fullDate === selectedDate;
+                  const isDrop = payload.fullDate === '2026-06-29';
+                  return (
+                    <circle
+                      key={payload.fullDate}
+                      cx={cx}
+                      cy={cy}
+                      r={isSel ? 7 : isDrop ? 6 : 4}
+                      fill={isSel ? '#00f2fe' : isDrop ? '#ff0844' : '#4facfe'}
+                      stroke={isSel ? '#ffffff' : '#000000'}
+                      strokeWidth={isSel ? 3 : 1}
+                      style={{ cursor: 'pointer' }}
+                      onMouseEnter={(e) => {
+                        e.stopPropagation();
+                        setHoveredLine('pickingRate');
+                      }}
+                    />
+                  );
+                }}
+                activeDot={(props) => {
+                  const { payload } = props;
+                  if (!payload || payload.pickingRate === null) return null;
+                  return <circle {...props} r={9} fill="#00f2fe" />;
+                }}
+              >
+                <LabelList content={<CustomLabel />} />
+                <LabelList content={<CustomSubLabel />} />
+              </Line>
+            )}
+            {showMissionCountLine && (
+              <Line
+                yAxisId="right"
+                type="monotone"
+                dataKey="completedCount"
+                stroke="#10b981"
+                strokeWidth={2.5}
+                onMouseEnter={() => setHoveredLine('completedCount')}
+                dot={(props) => {
+                  const { cx, cy, payload } = props;
+                  const isSel = payload.fullDate === selectedDate;
+                  return (
+                    <circle
+                      key={`comp-${payload.fullDate}`}
+                      cx={cx}
+                      cy={cy}
+                      r={isSel ? 6 : 4}
+                      fill="#10b981"
+                      stroke={isSel ? '#ffffff' : '#000000'}
+                      strokeWidth={isSel ? 2 : 1}
+                      style={{ cursor: 'pointer' }}
+                      onMouseEnter={(e) => {
+                        e.stopPropagation();
+                        setHoveredLine('completedCount');
+                      }}
+                    />
+                  );
+                }}
+                activeDot={{ r: 8, fill: '#10b981' }}
+              >
+                <LabelList content={<CustomMissionLabel />} />
+              </Line>
+            )}
             <defs>
               <linearGradient id="lineGradient" x1="0" y1="0" x2="1" y2="0">
                 <stop offset="0%" stopColor="#4facfe" />
@@ -631,9 +639,35 @@ export default function PickingTrendView({
           gap: '6px',
           boxShadow: '0 4px 15px rgba(0,0,0,0.3)'
         }}>
-          <div style={{ fontWeight: 700, color: 'var(--accent-cyan)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px' }}>
+          <div style={{ fontWeight: 700, color: 'var(--accent-cyan)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
             <span>📌 차트 점 아래 항목 표시 설정</span>
-            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>체크 시 점 아래에 선택된 항목 표시</span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', fontWeight: 400 }}>체크 시 해당 항목/그래프 표시</span>
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center', paddingLeft: '10px', borderLeft: '1px solid rgba(255,255,255,0.15)' }}>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', userSelect: 'none' }}>
+                  <input
+                    type="checkbox"
+                    checked={showPickingRateLine}
+                    onChange={(e) => setShowPickingRateLine(e.target.checked)}
+                    style={{ accentColor: '#00f2fe', cursor: 'pointer' }}
+                  />
+                  <span style={{ color: showPickingRateLine ? '#00f2fe' : 'var(--text-muted)', fontWeight: showPickingRateLine ? 700 : 400 }}>
+                    피킹율 그래프
+                  </span>
+                </label>
+                <label style={{ display: 'flex', alignItems: 'center', gap: '5px', cursor: 'pointer', userSelect: 'none' }}>
+                  <input
+                    type="checkbox"
+                    checked={showMissionCountLine}
+                    onChange={(e) => setShowMissionCountLine(e.target.checked)}
+                    style={{ accentColor: '#10b981', cursor: 'pointer' }}
+                  />
+                  <span style={{ color: showMissionCountLine ? '#10b981' : 'var(--text-muted)', fontWeight: showMissionCountLine ? 700 : 400 }}>
+                    미션 수 그래프
+                  </span>
+                </label>
+              </div>
+            </div>
           </div>
 
           <div style={{ display: 'flex', gap: '14px', flexWrap: 'wrap' }}>

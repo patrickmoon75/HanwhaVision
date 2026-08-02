@@ -10,11 +10,15 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
   const pickQty = dateInfo.totalPickQty ?? 0;
   const algoDynamicDesc = `${dateInfo.pickingDate}의 전체 피킹 손실(${totalLoss}%) 중, 당일 실제 발생한 인프라 차단 손실(${dateInfo.infraLossRate}%)과 현장 파레트 에러(${dateInfo.opErrorLossRate}%), 그리고 전날(${dateInfo.prevDate}) 지게차 완료 미션 부족(${prevMissions}건 / 기준 150건 대비 부족)에 따른 야드플랜 미실행 요인(${dateInfo.yardPlanLossRate ?? 0}%)을 제하고 남은 순수한 배치 계획상 오차(${dateInfo.algoLossRate}%)입니다. 당일 피킹 지시 오더 ${pickQty}건 및 전일 지게차 적치 데이터를 종합 분석하여 최종 판정하였습니다.`;
 
+  const level5Loss = Number(dateInfo.level5LossRate || 0);
+  const infraLoss = Math.max(0, Number(dateInfo.infraLossRate || dateInfo.blockedPickRate || 0) - level5Loss);
+
   const pieData = [
-    { name: '1. 인프라 차단 손실 (고객사 책임)', value: dateInfo.infraLossRate, color: '#ff0844' },
-    { name: '2. 현장 파레트 부실 (고객사 책임)', value: dateInfo.opErrorLossRate, color: '#ffb199' },
-    { name: '3. 배치계획 오차 (RWCS 영역)', value: dateInfo.algoLossRate, color: '#00f2fe' },
-    { name: '4. 야드플랜 미실행 (RWCS/운영 책임)', value: dateInfo.yardPlanLossRate ?? 0, color: '#ffd600' }
+    { name: '1. 5단 갇힘 손실 (Level 5 Hard Blocked, 고객사 100% 책임)', value: Number(level5Loss.toFixed(2)), color: '#ef4444' },
+    { name: '2. 1~4단 인프라 차단 손실 (고객사 책임)', value: Number(infraLoss.toFixed(2)), color: '#ff0844' },
+    { name: '3. 현장 파레트 부실 (고객사 책임)', value: dateInfo.opErrorLossRate, color: '#ffb199' },
+    { name: '4. 배치계획 오차 (RWCS 영역)', value: dateInfo.algoLossRate, color: '#00f2fe' },
+    { name: '5. 야드플랜 미실행 (RWCS/운영 책임)', value: dateInfo.yardPlanLossRate ?? 0, color: '#ffd600' }
   ];
 
   // 단수별 Soft Reset 카운트: 전일(prevLevelCounts) vs 당일(levelCounts)

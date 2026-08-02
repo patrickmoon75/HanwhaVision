@@ -46,6 +46,23 @@ async function fetchAllFromTable(tableName) {
   return allData.flat();
 }
 
+export async function fetchDefaultPendingOrders() {
+  try {
+    const doRes = await fetch('/★확정DO.xlsx');
+    if (!doRes.ok) return [];
+    const doBlob = await doRes.arrayBuffer();
+    const wbDo = XLSX.read(doBlob, { type: 'array' });
+    const sheetName = wbDo.SheetNames[0];
+    if (!sheetName) return [];
+    const rows = XLSX.utils.sheet_to_json(wbDo.Sheets[sheetName]);
+    console.log(`Loaded default pending orders from ★확정DO.xlsx (${rows.length} rows)`);
+    return rows;
+  } catch (err) {
+    console.warn("Failed to load default ★확정DO.xlsx:", err);
+    return [];
+  }
+}
+
 export async function fetchSupabaseData() {
   if (!isSupabaseConfigured || !supabase) {
     throw new Error("Supabase URL or Key is not configured in environment variables.");
@@ -60,21 +77,30 @@ export async function fetchSupabaseData() {
   const rackRows = XLSX.utils.sheet_to_json(wbRack.Sheets[wbRack.SheetNames[0]]);
 
   console.log("Fetching operational datasets in paginated chunks...");
-  const [planRows, missionRows, inventoryRows, pickingRows] = await Promise.all([
+  let [planRows, missionRows, inventoryRows, pickingRows, pendingOrderRows] = await Promise.all([
     fetchAllFromTable('batch_plans'),
     fetchAllFromTable('mission_logs'),
     fetchAllFromTable('inventory_status'),
-    fetchAllFromTable('picking_orders')
+    fetchAllFromTable('picking_orders'),
+    fetchAllFromTable('pending_orders').catch(err => {
+      console.warn("pending_orders fetch skipped or table missing, falling back to ★확정DO.xlsx:", err);
+      return [];
+    })
   ]);
+
+  if (!pendingOrderRows || pendingOrderRows.length === 0) {
+    pendingOrderRows = await fetchDefaultPendingOrders();
+  }
 
   console.log("Supabase fetch successful:", {
     planRowsCount: planRows.length,
     missionRowsCount: missionRows.length,
     inventoryRowsCount: inventoryRows.length,
-    pickingRowsCount: pickingRows.length
+    pickingRowsCount: pickingRows.length,
+    pendingOrderRowsCount: pendingOrderRows.length
   });
 
-  const rawDatasets = { rackRows, planRows, missionRows, inventoryRows, pickingRows };
+  const rawDatasets = { rackRows, planRows, missionRows, inventoryRows, pickingRows, pendingOrderRows };
   const processed = processRawDatasets(rawDatasets);
   return { ...processed, rawDatasets, dataSource: 'supabase' };
 }
@@ -86,7 +112,7 @@ export async function fetchExcelData() {
   const wbRack = XLSX.read(rackBlob, { type: 'array' });
   const rackRows = XLSX.utils.sheet_to_json(wbRack.Sheets[wbRack.SheetNames[0]]);
 
-  const dataRes = await fetch('/창고데이터_수정.xlsx');
+  const dataRes = await fetch('/★창고데이터(분석용).xlsx');
   const dataBlob = await dataRes.arrayBuffer();
   const wbData = XLSX.read(dataBlob, { type: 'array' });
 
@@ -95,7 +121,15 @@ export async function fetchExcelData() {
   const inventoryRows = XLSX.utils.sheet_to_json(wbData.Sheets['재고현황'] || wbData.Sheets[wbData.SheetNames[2]]);
   const pickingRows = XLSX.utils.sheet_to_json(wbData.Sheets['피킹오더'] || wbData.Sheets[wbData.SheetNames[3]]);
 
-  const rawDatasets = { rackRows, planRows, missionRows, inventoryRows, pickingRows };
+  // 로컬 엑셀의 미출고 DO 시트 ('미출고DO', '미출고오더', 'PendingDO', 'PendingOrders', 'pending_orders') 탐색 및 파싱
+  const pendingOrderSheet = wbData.Sheets['미출고DO'] || wbData.Sheets['미출고오더'] || wbData.Sheets['PendingDO'] || wbData.Sheets['PendingOrders'] || wbData.Sheets['pending_orders'] || wbData.Sheets['미출고_DO'];
+  let pendingOrderRows = pendingOrderSheet ? XLSX.utils.sheet_to_json(pendingOrderSheet) : [];
+
+  if (!pendingOrderRows || pendingOrderRows.length === 0) {
+    pendingOrderRows = await fetchDefaultPendingOrders();
+  }
+
+  const rawDatasets = { rackRows, planRows, missionRows, inventoryRows, pickingRows, pendingOrderRows };
   const processed = processRawDatasets(rawDatasets);
   return { ...processed, rawDatasets, dataSource: 'excel' };
 }
@@ -192,6 +226,42 @@ export function extractDataAvailabilitySets(rawDatasets = {}) {
   };
 }
 
+// 동적 파렛트당 평균 적재량 (AvgQtyPerPallet_i) 역산 헬퍼 (Fallback: 100 EA)
+export function buildAvgQtyPerPalletMap(inventoryRows = []) {
+  const map = new Map();
+  if (!inventoryRows || inventoryRows.length === 0) return map;
+
+  const skuPalletSetMap = new Map();
+  const skuTotalQtyMap = new Map();
+
+  inventoryRows.forEach(inv => {
+    const itemId = inv.itemId || inv.ItemId || inv.itemid || inv.ItemID;
+    const palletId = inv.palletId || inv.PalletId || inv.palletID || inv.PalletID;
+    const qty = Number(inv.piecesOnhand || inv.piecesonhand || inv.PiecesOnHand) || 0;
+    if (!itemId) return;
+
+    if (!skuPalletSetMap.has(itemId)) {
+      skuPalletSetMap.set(itemId, new Set());
+      skuTotalQtyMap.set(itemId, 0);
+    }
+    if (palletId) {
+      skuPalletSetMap.get(itemId).add(palletId);
+    }
+    skuTotalQtyMap.set(itemId, skuTotalQtyMap.get(itemId) + qty);
+  });
+
+  skuTotalQtyMap.forEach((totalQty, itemId) => {
+    const palletCount = skuPalletSetMap.get(itemId)?.size || 0;
+    if (palletCount > 0 && totalQty > 0) {
+      const avgQty = Math.round(totalQty / palletCount);
+      map.set(itemId, avgQty > 0 ? avgQty : 100);
+    } else {
+      map.set(itemId, 100); // Fallback
+    }
+  });
+
+  return map;
+}
 
 export function processRawDatasets({ rackRows, planRows, missionRows, inventoryRows, pickingRows }) {
   // 1. Physical Master KPI
@@ -302,15 +372,30 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
     const yardPickQty = dayPickings.filter(p => yardIds.has(p.LocationId)).reduce((sum, p) => sum + (Number(p.ItemQty) || 0), 0);
     const yardPickingRate = totalPickQty > 0 ? ((yardPickQty / totalPickQty) * 100).toFixed(2) : '0.00';
 
-    // (D) 접근불가 랙 출고량: LocationId의 Blocked === TRUE 인 랙에서 출고되는 아이템 수량 합계
+    // (D) 접근불가 랙 출고량: LocationId의 Blocked === TRUE 인 랙 또는 Level 5(5단 Hard Blocked) 출고 수량 합계
     let blockedRackPickQty = 0;
+    let blockedLevel5Qty = 0;
+    let blockedLevel1to4Qty = 0;
+
     dayPickings.forEach(p => {
       const r = rackMap.get(p.LocationId);
-      if (r && (r.Blocked === true || String(r.Blocked).toUpperCase() === 'TRUE')) {
-        blockedRackPickQty += (Number(p.ItemQty) || 0);
+      const isBlocked = r && (r.Blocked === true || String(r.Blocked).toUpperCase() === 'TRUE');
+      const isLevel5 = (r && Number(r.Level) === 5) || String(p.LocationId || '').endsWith('0') || String(p.LocationId || '').endsWith('5');
+
+      if (isBlocked || isLevel5) {
+        const qty = (Number(p.ItemQty) || 0);
+        blockedRackPickQty += qty;
+        if (isLevel5) {
+          blockedLevel5Qty += qty;
+        } else {
+          blockedLevel1to4Qty += qty;
+        }
       }
     });
+
     const blockedPickRate = totalPickQty > 0 ? ((blockedRackPickQty / totalPickQty) * 100).toFixed(2) : '0.00';
+    const level5LossRate = totalPickQty > 0 ? ((blockedLevel5Qty / totalPickQty) * 100).toFixed(2) : '0.00';
+    const level1to4LossRate = totalPickQty > 0 ? ((blockedLevel1to4Qty / totalPickQty) * 100).toFixed(2) : '0.00';
 
     // (E) 야드 외 출고량: 총출고량 - 야드에서 출고량 - 접근불가 랙 출고량
     const availRackPickQty = Math.max(0, totalPickQty - yardPickQty - blockedRackPickQty);

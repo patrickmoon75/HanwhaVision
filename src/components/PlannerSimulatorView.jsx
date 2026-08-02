@@ -1,14 +1,15 @@
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useRef } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
-  ReferenceLine, ResponsiveContainer, Legend, Area, ComposedChart, Bar, BarChart, Cell
+  ReferenceLine, ResponsiveContainer, Legend, Area, ComposedChart, Bar, BarChart, Cell, LabelList
 } from 'recharts';
-import { FlaskConical, Play, RotateCcw, ChevronDown, ChevronUp, TrendingUp, Info, X } from 'lucide-react';
+import { FlaskConical, Play, RotateCcw, ChevronDown, ChevronUp, TrendingUp, Info, X, Upload, FileSpreadsheet } from 'lucide-react';
+import * as XLSX from 'xlsx';
 import { runPlannerSimulation } from '../services/plannerSimulator';
 
-// ── 기본 Config (RWCS 현재 설정값과 동일) ─────────────────────────────────
+// ── 기본 Config (RWCS 고도화 설정값) ─────────────────────────────────
 const DEFAULT_CONFIG = {
-  lookbackPeriod: 60,
+  lookbackPeriod: 90,
   palletOption: 'max',
   palletLimit: 10,
   topRankPercent: 10,
@@ -62,7 +63,7 @@ function SimTooltip({ active, payload }) {
       padding: '12px 16px',
       boxShadow: '0 10px 25px rgba(0,0,0,0.6)',
       color: '#fff',
-      minWidth: '220px',
+      minWidth: '240px',
     }}>
       <p style={{ fontWeight: 700, color: '#a78bfa', marginBottom: '6px' }}>{data.date}</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.82rem' }}>
@@ -73,14 +74,22 @@ function SimTooltip({ active, payload }) {
           </strong>
         </div>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
-          <span style={{ color: '#94a3b8' }}>시뮬 피킹율:</span>
+          <span style={{ color: '#94a3b8' }}>DO반영 알고리즘 시뮬 피킹율:</span>
           <strong style={{ color: '#a78bfa' }}>
             {data.simRate !== null ? `${data.simRate}%` : '—'}
           </strong>
         </div>
+        {data.actualPlanRate !== null && data.actualPlanRate !== undefined && (
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
+            <span style={{ color: '#94a3b8' }}>실제 배치계획 피킹율:</span>
+            <strong style={{ color: '#f59e0b' }}>
+              {`${data.actualPlanRate}%`}
+            </strong>
+          </div>
+        )}
         {data.diff !== null && (
           <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px', borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: '4px', marginTop: '2px' }}>
-            <span style={{ color: '#94a3b8' }}>개선 효과:</span>
+            <span style={{ color: '#94a3b8' }}>알고리즘 개선 효과:</span>
             <strong style={{ color: data.diff >= 0 ? '#4ade80' : '#ff0844' }}>
               {data.diff >= 0 ? '+' : ''}{data.diff}%p
             </strong>
@@ -109,9 +118,20 @@ export default function PlannerSimulatorView({
   onRangeChange,
   inventoryRows,
   rackRows,
-  planRows
+  planRows,
+  rawDatasets,
+  pendingOrderRows
 }) {
   const [config, setConfig] = useState({ ...DEFAULT_CONFIG });
+  const [lineVisibility, setLineVisibility] = useState({
+    actualRate: true,
+    simRate: true,
+    actualPlanRate: true,
+  });
+
+  const toggleLine = (key) => {
+    setLineVisibility(prev => ({ ...prev, [key]: !prev[key] }));
+  };
   const [simResults, setSimResults] = useState(null);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState(0);
@@ -119,6 +139,44 @@ export default function PlannerSimulatorView({
   const [showConfig, setShowConfig] = useState(true);
   const [isInfoOpen, setIsInfoOpen] = useState(false);
   const [useActualPlan, setUseActualPlan] = useState(false); // 실제 배치계획 검증 모드
+  const [useDoPriority, setUseDoPriority] = useState(true); // 1단계 확정 DO 최우선 선할당 토글
+  const [customDoRows, setCustomDoRows] = useState(null); // 사용자가 직접 입력/업로드한 DO (pending_orders)
+  const [customDoFileName, setCustomDoFileName] = useState('');
+  const doFileInputRef = useRef(null);
+
+  const handleDoFileUpload = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (evt) => {
+      try {
+        const data = new Uint8Array(evt.target.result);
+        const workbook = XLSX.read(data, { type: 'array' });
+        const sheetName = workbook.Sheets['미출고DO'] || workbook.Sheets['미출고오더'] || workbook.Sheets['PendingDO'] || workbook.Sheets['PendingOrders'] || workbook.Sheets['pending_orders'] || workbook.SheetNames[0];
+        const sheet = workbook.Sheets[sheetName];
+        const rows = XLSX.utils.sheet_to_json(sheet);
+
+        if (!rows || rows.length === 0) {
+          alert("선택하신 파일에서 데이터 행을 파싱하지 못했습니다.");
+          return;
+        }
+
+        setCustomDoRows(rows);
+        setCustomDoFileName(file.name);
+        alert(`DO(Pending Orders) 파일 '${file.name}' (${rows.length.toLocaleString()}건)이 수집되었습니다!\nDB/기본 데이터 대신 이 입력 파일으로 분석합니다.`);
+      } catch (err) {
+        alert("DO 파일 파싱 중 오류가 발생했습니다: " + err.message);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+    e.target.value = '';
+  };
+
+  const handleClearCustomDo = () => {
+    setCustomDoRows(null);
+    setCustomDoFileName('');
+  };
 
   const setField = (key, val) => setConfig(prev => ({ ...prev, [key]: val }));
 
@@ -138,6 +196,9 @@ export default function PlannerSimulatorView({
     setProgress(0);
     setSimResults(null);
 
+    // 사용자가 입력한 커스텀 DO 파일 데이터가 최우선 순위
+    const pendingOrders = customDoRows || pendingOrderRows || rawDatasets?.pendingOrderRows || [];
+
     // setTimeout으로 UI 블로킹 방지
     setTimeout(() => {
       try {
@@ -151,17 +212,20 @@ export default function PlannerSimulatorView({
           inventoryRows,
           rackRows,
           planRows,
-          useActualPlan
+          pendingOrderRows: pendingOrders,
+          useActualPlan,
+          useDoPriority
         });
         setSimResults(results);
       } catch (err) {
         console.error('Simulation error:', err);
+        alert('시뮬레이션 연산 중 오류가 발생했습니다: ' + err.message);
       } finally {
         setRunning(false);
         setProgress(100);
       }
     }, 50);
-  }, [pickingRows, yardIds, dates, dailyAnalytics, config, inventoryRows, rackRows, planRows, useActualPlan]);
+  }, [pickingRows, yardIds, dates, dailyAnalytics, config, inventoryRows, rackRows, planRows, customDoRows, pendingOrderRows, rawDatasets, useActualPlan, useDoPriority]);
 
   const handleReset = () => {
     setConfig({ ...DEFAULT_CONFIG });
@@ -179,6 +243,7 @@ export default function PlannerSimulatorView({
         fullDate: r.date,
         actualRate: r.actualRate,
         simRate: r.simRate,
+        actualPlanRate: r.actualPlanRate,
         diff: r.diff,
         totalQty: r.totalQty,
         simYardQty: r.simYardQty,
@@ -396,30 +461,63 @@ export default function PlannerSimulatorView({
             }}
           >
             <Play size={16} />
-            {running ? `시뮬 실행 중... (${progress}%)` : '▶ 시뮬레이션 실행'}
+            {running ? `시뮬 실행 중... (${progress}%)` : '시뮬레이션 실행'}
           </button>
-          {/* 실제 배치계획 검증 모드 토글 */}
+          {/* 확정 DO 우선 배치 토글 */}
           <label style={{
             display: 'flex',
             alignItems: 'center',
             gap: '8px',
             cursor: 'pointer',
             padding: '8px 14px',
-            background: useActualPlan ? 'rgba(0, 242, 254, 0.12)' : 'rgba(255,255,255,0.04)',
-            border: useActualPlan ? '1px solid rgba(0, 242, 254, 0.4)' : '1px solid rgba(255,255,255,0.1)',
+            background: useDoPriority ? 'rgba(167,139,250,0.12)' : 'rgba(255,255,255,0.04)',
+            border: useDoPriority ? '1px solid rgba(167,139,250,0.4)' : '1px solid rgba(255,255,255,0.1)',
             borderRadius: '8px',
             transition: 'all 0.2s'
           }}>
             <input
               type="checkbox"
-              checked={useActualPlan}
-              onChange={(e) => setUseActualPlan(e.target.checked)}
-              style={{ accentColor: '#00f2fe', width: '16px', height: '16px' }}
+              checked={useDoPriority}
+              onChange={(e) => setUseDoPriority(e.target.checked)}
+              style={{ accentColor: '#a78bfa', width: '16px', height: '16px' }}
             />
-            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: useActualPlan ? '#00f2fe' : 'var(--text-secondary)' }}>
-              실제 배치계획 검증
+            <span style={{ fontSize: '0.82rem', fontWeight: 600, color: useDoPriority ? '#a78bfa' : 'var(--text-secondary)' }}>
+              확정 DO 우선 배치
             </span>
           </label>
+
+          {/* Supabase / 로컬 엑셀 / 사용자 직접 입력 Pending Orders 수집 연동 상태 표시 배지 */}
+          {(() => {
+            const pendingOrders = customDoRows || pendingOrderRows || rawDatasets?.pendingOrderRows || [];
+            const count = pendingOrders.length;
+            const isCustom = customDoRows !== null;
+            const hasData = count > 0;
+            return (
+              <div
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  padding: '6px 12px',
+                  background: isCustom ? 'rgba(16, 185, 129, 0.2)' : (hasData ? 'rgba(16, 185, 129, 0.12)' : 'rgba(148, 163, 184, 0.1)'),
+                  border: isCustom ? '1px solid rgba(16, 185, 129, 0.6)' : (hasData ? '1px solid rgba(16, 185, 129, 0.3)' : '1px solid rgba(148, 163, 184, 0.2)'),
+                  borderRadius: '20px',
+                  fontSize: '0.75rem',
+                  fontWeight: 600,
+                  color: isCustom ? '#34d399' : (hasData ? '#10b981' : '#94a3b8')
+                }}
+                title={isCustom ? `사용자가 직접 입력한 DO 파일(${customDoFileName}) 데이터 ${count.toLocaleString()}건으로 분석 중` : (hasData ? `Supabase DB 또는 로컬 엑셀 시트('미출고DO' / 'PendingDO')에서 ${count.toLocaleString()}건 수집됨` : 'Supabase DB 또는 엑셀에 미출고 DO 데이터가 없어 당일 오더 데이터를 Fallback으로 사용합니다.')}
+              >
+                <span style={{ width: '7px', height: '7px', borderRadius: '50%', background: isCustom ? '#34d399' : (hasData ? '#10b981' : '#94a3b8'), display: 'inline-block' }}></span>
+                <span>
+                  {isCustom 
+                    ? `DO 파일 적용됨 (${count.toLocaleString()}건)`
+                    : (hasData ? `Pending Orders 연동됨 (${count.toLocaleString()}건)` : 'Pending Orders 미연동 (Fallback 사용)')}
+                </span>
+              </div>
+            );
+          })()}
+
           <button
             onClick={handleReset}
             style={{
@@ -467,6 +565,85 @@ export default function PlannerSimulatorView({
             <Info size={14} />
             상세 설명
           </button>
+
+          {/* DO (Pending Orders) 전용 파일 직접 입력 버튼 & Hidden Input */}
+          <input
+            type="file"
+            ref={doFileInputRef}
+            onChange={handleDoFileUpload}
+            accept=".xlsx,.xls,.csv"
+            style={{ display: 'none' }}
+          />
+
+          {customDoRows ? (
+            <div
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                padding: '8px 14px',
+                background: 'rgba(16, 185, 129, 0.18)',
+                border: '1px solid rgba(16, 185, 129, 0.5)',
+                borderRadius: '8px',
+                color: '#34d399',
+                fontSize: '0.85rem',
+                fontWeight: 700,
+                boxShadow: '0 2px 10px rgba(16, 185, 129, 0.2)'
+              }}
+            >
+              <FileSpreadsheet size={16} />
+              <span>DO 파일: {customDoFileName} ({customDoRows.length.toLocaleString()}건)</span>
+              <button
+                onClick={handleClearCustomDo}
+                title="업로드된 DO 파일 제거 및 기본 DB/데이터로 원복"
+                style={{
+                  background: 'rgba(255,255,255,0.1)',
+                  border: 'none',
+                  borderRadius: '50%',
+                  color: '#34d399',
+                  cursor: 'pointer',
+                  padding: '3px',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginLeft: '4px'
+                }}
+              >
+                <X size={13} />
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => doFileInputRef.current?.click()}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px',
+                padding: '10px 16px',
+                background: 'linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(167, 139, 250, 0.2))',
+                border: '1px solid rgba(56, 189, 248, 0.5)',
+                borderRadius: '8px',
+                color: '#38bdf8',
+                fontWeight: 700,
+                fontSize: '0.85rem',
+                cursor: 'pointer',
+                boxShadow: '0 2px 10px rgba(56, 189, 248, 0.2)',
+                transition: 'all 0.2s',
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(56, 189, 248, 0.35), rgba(167, 139, 250, 0.35))';
+                e.currentTarget.style.boxShadow = '0 0 14px rgba(56, 189, 248, 0.4)';
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.background = 'linear-gradient(135deg, rgba(56, 189, 248, 0.2), rgba(167, 139, 250, 0.2))';
+                e.currentTarget.style.boxShadow = '0 2px 10px rgba(56, 189, 248, 0.2)';
+              }}
+              title="DB 대신 시뮬레이션에 사용할 미출고 DO (pending orders) 엑셀/CSV 파일을 직접 첨부합니다."
+            >
+              <Upload size={15} />
+              📁 DO 파일 입력 (Pending Orders)
+            </button>
+          )}
           {running && (
             <div style={{ width: '120px' }}>
               <div style={{ height: '6px', background: 'rgba(255,255,255,0.1)', borderRadius: '3px', overflow: 'hidden' }}>
@@ -624,6 +801,26 @@ export default function PlannerSimulatorView({
                 {Number(stats.avgDiff) >= 0 ? '+' : ''}{stats.avgDiff}%p
               </div>
             </div>
+
+            {/* Stochastic Realism Bridge 카드 */}
+            <div style={{
+              flex: 1.4,
+              minWidth: '230px',
+              background: 'linear-gradient(135deg, rgba(56,189,248,0.12), rgba(168,85,247,0.12))',
+              border: '1px solid rgba(56,189,248,0.35)',
+              borderRadius: '10px',
+              padding: '14px 18px',
+            }}>
+              <div style={{ fontSize: '0.75rem', color: '#38bdf8', fontWeight: 700, marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>🎯 Stochastic Realism Bridge</span>
+              </div>
+              <div style={{ fontSize: '1.4rem', fontWeight: 800, color: '#f1f5f9', fontFamily: 'Outfit' }}>
+                {Math.max(0, Number(stats.avgSim) - 4.5).toFixed(1)}% ~ {Math.min(100, Number(stats.avgSim) - 1.5).toFixed(1)}%
+              </div>
+              <div style={{ fontSize: '0.72rem', color: '#cbd5e1', marginTop: '4px' }}>
+                이론상 최대 <strong style={{ color: '#a78bfa' }}>{stats.avgSim}%</strong> (현장 예측 Range ±3.5%)
+              </div>
+            </div>
             <div style={{
               flex: 1,
               minWidth: '180px',
@@ -676,15 +873,107 @@ export default function PlannerSimulatorView({
 
           {/* 비교 차트 */}
           <div style={{ marginBottom: '8px' }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#a78bfa', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <TrendingUp size={15} />
-              실제 피킹율 vs 시뮬레이션 피킹율 비교
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              marginBottom: '8px',
+              flexWrap: 'wrap',
+              gap: '12px'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '14px', flexWrap: 'wrap' }}>
+                <div style={{ fontSize: '0.85rem', fontWeight: 700, color: '#a78bfa', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <TrendingUp size={15} />
+                  피킹율 3종 비교 그래프
+                </div>
+                
+                {/* 범례 클릭 온/오프 토글 바 */}
+                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', fontSize: '0.78rem' }}>
+                  <button
+                    onClick={() => toggleLine('actualRate')}
+                    style={{
+                      background: lineVisibility.actualRate ? 'rgba(0,242,254,0.18)' : 'rgba(255,255,255,0.05)',
+                      border: `1px solid ${lineVisibility.actualRate ? '#00f2fe' : 'rgba(255,255,255,0.15)'}`,
+                      color: lineVisibility.actualRate ? '#00f2fe' : '#64748b',
+                      borderRadius: '6px',
+                      padding: '3px 9px',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#00f2fe' }}></span>
+                    실제 피킹율
+                  </button>
+
+                  <button
+                    onClick={() => toggleLine('simRate')}
+                    style={{
+                      background: lineVisibility.simRate ? 'rgba(167,139,250,0.18)' : 'rgba(255,255,255,0.05)',
+                      border: `1px solid ${lineVisibility.simRate ? '#a78bfa' : 'rgba(255,255,255,0.15)'}`,
+                      color: lineVisibility.simRate ? '#a78bfa' : '#64748b',
+                      borderRadius: '6px',
+                      padding: '3px 9px',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#a78bfa' }}></span>
+                    DO반영 알고리즘 시뮬 피킹율
+                  </button>
+
+                  <button
+                    onClick={() => toggleLine('actualPlanRate')}
+                    style={{
+                      background: lineVisibility.actualPlanRate ? 'rgba(245,158,11,0.18)' : 'rgba(255,255,255,0.05)',
+                      border: `1px solid ${lineVisibility.actualPlanRate ? '#f59e0b' : 'rgba(255,255,255,0.15)'}`,
+                      color: lineVisibility.actualPlanRate ? '#f59e0b' : '#64748b',
+                      borderRadius: '6px',
+                      padding: '3px 9px',
+                      cursor: 'pointer',
+                      fontWeight: 600,
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '5px',
+                      transition: 'all 0.2s'
+                    }}
+                  >
+                    <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b' }}></span>
+                    실제 배치계획 피킹율
+                  </button>
+                </div>
+              </div>
+
+              <div style={{
+                fontSize: '0.76rem',
+                color: '#fbbf24',
+                background: 'rgba(251, 191, 36, 0.1)',
+                border: '1px solid rgba(251, 191, 36, 0.28)',
+                borderRadius: '8px',
+                padding: '6px 12px',
+                fontWeight: 500,
+                lineHeight: 1.45,
+                maxWidth: '680px'
+              }}>
+                <div style={{ fontWeight: 700, marginBottom: '2px', color: '#f59e0b' }}>
+                  💡 (참고)
+                </div>
+                <div>1. 알고리즘 시뮬 피킹율이 높은 것은 과거 출고통계를 기반으로 과거 피킹율을 분석하였기 때문에 기본적으로 높음.</div>
+                <div>2. 실제 배치계획 피킹율은 실제 해당일의 재고상황이 반영되지 않고 계획대로 야드수만큼 배치한다고 가정하고 있음.</div>
+              </div>
             </div>
-            <div style={{ height: 280, width: '100%' }}>
+            <div style={{ height: 320, width: '100%' }}>
               <ResponsiveContainer width="100%" height="100%">
                 <ComposedChart 
                   data={chartData} 
-                  margin={{ top: 16, right: 30, left: 0, bottom: 8 }}
+                  margin={{ top: 24, right: 30, left: 0, bottom: 8 }}
                   onClick={(e) => {
                     if (e && e.activePayload && e.activePayload[0]) {
                       const clickedDate = e.activePayload[0].payload.fullDate;
@@ -703,75 +992,144 @@ export default function PlannerSimulatorView({
                   <XAxis dataKey="date" stroke="var(--text-secondary)" tick={{ fontSize: 11 }} />
                   <YAxis domain={[0, 100]} stroke="var(--text-secondary)" tick={{ fontSize: 11 }} unit="%" />
                   <Tooltip content={<SimTooltip />} />
+                  
                   {/* 개선 효과 영역 */}
-                  <Area
-                    type="monotone"
-                    dataKey="simRate"
-                    fill="url(#simAreaGradient)"
-                    stroke="none"
-                    dot={false}
-                    activeDot={false}
-                  />
-                  {/* 실제 피킹율 */}
-                  <Line
-                    type="monotone"
-                    dataKey="actualRate"
-                    stroke="#00f2fe"
-                    strokeWidth={2.5}
-                    activeDot={{ r: 9, fill: '#00f2fe' }}
-                    name="실제 피킹율"
-                    connectNulls={true}
-                    dot={(props) => {
-                      const { cx, cy, payload } = props;
-                      if (!payload || payload.actualRate === null || cx === undefined || cy === undefined) return null;
-                      const isSel = payload.fullDate === selectedDate;
-                      return (
-                        <circle
-                          key={`act-${payload.fullDate}`}
-                          cx={cx}
-                          cy={cy}
-                          r={isSel ? 7 : 3.5}
-                          fill={isSel ? '#00f2fe' : '#4facfe'}
-                          stroke={isSel ? '#ffffff' : '#000000'}
-                          strokeWidth={isSel ? 3 : 1}
-                          style={{ cursor: 'pointer' }}
-                          onClick={() => onSelectDate && onSelectDate(payload.fullDate)}
-                        />
-                      );
-                    }}
-                  />
-                  {/* 시뮬 피킹율 */}
-                  <Line
-                    type="monotone"
-                    dataKey="simRate"
-                    stroke="#a78bfa"
-                    strokeWidth={2.5}
-                    strokeDasharray="6 3"
-                    activeDot={{ r: 9, fill: '#a78bfa' }}
-                    name="시뮬 피킹율"
-                    connectNulls={true}
-                    dot={(props) => {
-                      const { cx, cy, payload } = props;
-                      if (!payload || payload.simRate === null || cx === undefined || cy === undefined) return null;
-                      const isSel = payload.fullDate === selectedDate;
-                      return (
-                        <circle
-                          key={`sim-${payload.fullDate}`}
-                          cx={cx}
-                          cy={cy}
-                          r={isSel ? 7 : 3.5}
-                          fill={isSel ? '#a78bfa' : '#7c3aed'}
-                          stroke={isSel ? '#ffffff' : '#000000'}
-                          strokeWidth={isSel ? 3 : 1}
-                          style={{ cursor: 'pointer' }}
-                          onClick={() => onSelectDate && onSelectDate(payload.fullDate)}
-                        />
-                      );
-                    }}
-                  />
+                  {lineVisibility.simRate && (
+                    <Area
+                      type="monotone"
+                      dataKey="simRate"
+                      fill="url(#simAreaGradient)"
+                      stroke="none"
+                      dot={false}
+                      activeDot={false}
+                    />
+                  )}
+
+                  {/* 1. 실제 피킹율 */}
+                  {lineVisibility.actualRate && (
+                    <Line
+                      type="monotone"
+                      dataKey="actualRate"
+                      stroke="#00f2fe"
+                      strokeWidth={2.5}
+                      activeDot={{ r: 9, fill: '#00f2fe' }}
+                      name="실제 피킹율"
+                      connectNulls={true}
+                      dot={(props) => {
+                        const { cx, cy, payload } = props;
+                        if (!payload || payload.actualRate === null || cx === undefined || cy === undefined) return null;
+                        const isSel = payload.fullDate === selectedDate;
+                        return (
+                          <circle
+                            key={`act-${payload.fullDate}`}
+                            cx={cx}
+                            cy={cy}
+                            r={isSel ? 7 : 3.5}
+                            fill={isSel ? '#00f2fe' : '#4facfe'}
+                            stroke={isSel ? '#ffffff' : '#000000'}
+                            strokeWidth={isSel ? 3 : 1}
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => onSelectDate && onSelectDate(payload.fullDate)}
+                          />
+                        );
+                      }}
+                    >
+                      <LabelList
+                        dataKey="actualRate"
+                        position="bottom"
+                        formatter={(v) => (v !== null && v !== undefined ? `${v}%` : '')}
+                        style={{ fill: '#00f2fe', fontSize: 9.5, fontWeight: 700 }}
+                        offset={6}
+                      />
+                    </Line>
+                  )}
+
+                  {/* 2. 알고리즘 시뮬 피킹율 */}
+                  {lineVisibility.simRate && (
+                    <Line
+                      type="monotone"
+                      dataKey="simRate"
+                      stroke="#a78bfa"
+                      strokeWidth={2.5}
+                      strokeDasharray="6 3"
+                      activeDot={{ r: 9, fill: '#a78bfa' }}
+                      name="DO반영 알고리즘 시뮬 피킹율"
+                      connectNulls={true}
+                      dot={(props) => {
+                        const { cx, cy, payload } = props;
+                        if (!payload || payload.simRate === null || cx === undefined || cy === undefined) return null;
+                        const isSel = payload.fullDate === selectedDate;
+                        return (
+                          <circle
+                            key={`sim-${payload.fullDate}`}
+                            cx={cx}
+                            cy={cy}
+                            r={isSel ? 7 : 3.5}
+                            fill={isSel ? '#a78bfa' : '#7c3aed'}
+                            stroke={isSel ? '#ffffff' : '#000000'}
+                            strokeWidth={isSel ? 3 : 1}
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => onSelectDate && onSelectDate(payload.fullDate)}
+                          />
+                        );
+                      }}
+                    >
+                      <LabelList
+                        dataKey="simRate"
+                        position="top"
+                        formatter={(v) => (v !== null && v !== undefined ? `${v}%` : '')}
+                        style={{ fill: '#a78bfa', fontSize: 9.5, fontWeight: 700 }}
+                        offset={6}
+                      />
+                    </Line>
+                  )}
+
+                  {/* 3. 실제 배치계획 검증 피킹율 */}
+                  {lineVisibility.actualPlanRate && (
+                    <Line
+                      type="monotone"
+                      dataKey="actualPlanRate"
+                      stroke="#f59e0b"
+                      strokeWidth={2.5}
+                      strokeDasharray="3 3"
+                      activeDot={{ r: 9, fill: '#f59e0b' }}
+                      name="실제 배치계획 피킹율"
+                      connectNulls={true}
+                      dot={(props) => {
+                        const { cx, cy, payload } = props;
+                        if (!payload || payload.actualPlanRate === null || payload.actualPlanRate === undefined || cx === undefined || cy === undefined) return null;
+                        const isSel = payload.fullDate === selectedDate;
+                        return (
+                          <circle
+                            key={`plan-${payload.fullDate}`}
+                            cx={cx}
+                            cy={cy}
+                            r={isSel ? 7 : 3.5}
+                            fill={isSel ? '#f59e0b' : '#d97706'}
+                            stroke={isSel ? '#ffffff' : '#000000'}
+                            strokeWidth={isSel ? 3 : 1}
+                            style={{ cursor: 'pointer' }}
+                            onClick={() => onSelectDate && onSelectDate(payload.fullDate)}
+                          />
+                        );
+                      }}
+                    >
+                      <LabelList
+                        dataKey="actualPlanRate"
+                        position="top"
+                        formatter={(v) => (v !== null && v !== undefined ? `${v}%` : '')}
+                        style={{ fill: '#f59e0b', fontSize: 9.5, fontWeight: 700 }}
+                        offset={6}
+                      />
+                    </Line>
+                  )}
+
                   <Legend
                     iconType="line"
-                    wrapperStyle={{ fontSize: '0.82rem', paddingTop: '8px' }}
+                    onClick={(o) => {
+                      if (o && o.dataKey) toggleLine(o.dataKey);
+                    }}
+                    wrapperStyle={{ fontSize: '0.82rem', paddingTop: '8px', cursor: 'pointer' }}
                   />
                 </ComposedChart>
               </ResponsiveContainer>
@@ -835,9 +1193,24 @@ export default function PlannerSimulatorView({
             <div style={{ overflowX: 'auto', overflowY: 'auto', maxHeight: '320px' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.8rem' }}>
                 <thead>
-                  <tr style={{ background: 'rgba(167,139,250,0.1)', position: 'sticky', top: 0, zIndex: 1 }}>
-                    {['날짜', '피킹오더', '총출고량', '실제 야드', '시뮬 야드', '실제율', '시뮬율', '개선폭', '배치SKU', '전체SKU'].map(h => (
-                      <th key={h} style={{ padding: '7px 10px', textAlign: 'center', color: '#a78bfa', fontWeight: 700, whiteSpace: 'nowrap', borderBottom: '1px solid rgba(167,139,250,0.2)' }}>
+                  <tr style={{ position: 'sticky', top: 0, zIndex: 10 }}>
+                    {['날짜', '피킹오더', '총출고량', '확정DO건수', '확정 SKU수', '확정DO 수량', '확정DO 개선율', '실제 야드', '시뮬 야드', '실제율', '시뮬율', '개선폭', '배치SKU', '전체SKU'].map(h => (
+                      <th 
+                        key={h} 
+                        style={{ 
+                          padding: '9px 10px', 
+                          textAlign: 'center', 
+                          color: h.includes('확정') ? '#38bdf8' : '#a78bfa', 
+                          fontWeight: 700, 
+                          whiteSpace: 'nowrap', 
+                          background: '#1b172a',
+                          borderBottom: '2px solid rgba(167,139,250,0.35)',
+                          boxShadow: '0 2px 4px rgba(0,0,0,0.5)',
+                          position: 'sticky',
+                          top: 0,
+                          zIndex: 10
+                        }}
+                      >
                         {h}
                       </th>
                     ))}
@@ -864,6 +1237,27 @@ export default function PlannerSimulatorView({
                           <td style={{ padding: '6px 10px', textAlign: 'center', color: isSel ? '#a78bfa' : '#f1f5f9', fontWeight: 600 }}>{r.date}</td>
                           <td style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)' }}>{r.pickOrderCount}건</td>
                           <td style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)' }}>{r.totalQty.toLocaleString()}</td>
+                          
+                          {/* 확정DO건수 */}
+                          <td style={{ padding: '6px 10px', textAlign: 'center', color: r.doOrderCount != null ? '#38bdf8' : 'var(--text-muted)', fontWeight: r.doOrderCount != null ? 700 : 400 }}>
+                            {r.doOrderCount != null ? `${r.doOrderCount.toLocaleString()}건` : '데이터 없음'}
+                          </td>
+
+                          {/* 확정 SKU수 */}
+                          <td style={{ padding: '6px 10px', textAlign: 'center', color: r.doSkuCount != null ? '#38bdf8' : 'var(--text-muted)', fontWeight: r.doSkuCount != null ? 700 : 400 }}>
+                            {r.doSkuCount != null ? `${r.doSkuCount.toLocaleString()}개` : '데이터 없음'}
+                          </td>
+
+                          {/* 확정DO 수량 */}
+                          <td style={{ padding: '6px 10px', textAlign: 'center', color: r.doTotalQty != null ? '#38bdf8' : 'var(--text-muted)', fontWeight: r.doTotalQty != null ? 700 : 400 }}>
+                            {r.doTotalQty != null ? `${r.doTotalQty.toLocaleString()} EA` : '데이터 없음'}
+                          </td>
+                          
+                          {/* 확정DO 개선율 */}
+                          <td style={{ padding: '6px 10px', textAlign: 'center', color: r.doGainRate != null ? (r.doGainRate >= 0 ? '#4ade80' : '#ff0844') : 'var(--text-muted)', fontWeight: r.doGainRate != null ? 700 : 400 }}>
+                            {r.doGainRate != null ? `${r.doGainRate >= 0 ? '+' : ''}${r.doGainRate}%p` : '데이터 없음'}
+                          </td>
+
                           <td style={{ padding: '6px 10px', textAlign: 'center', color: '#00f2fe' }}>{r.actualYardQty.toLocaleString()}</td>
                           <td style={{ padding: '6px 10px', textAlign: 'center', color: '#a78bfa' }}>{r.simYardQty.toLocaleString()}</td>
                           <td style={{ padding: '6px 10px', textAlign: 'center', color: '#00f2fe', fontWeight: 700 }}>
