@@ -1,4 +1,4 @@
-import { ShieldAlert, Server, AlertTriangle, Layers, Calendar, Cpu, Database, FileSpreadsheet, FolderOpen, FileCheck, Download } from 'lucide-react';
+import { ShieldAlert, Server, AlertTriangle, Layers, Calendar, Cpu, Database, FileSpreadsheet, FolderOpen, FileCheck, Download, LogOut } from 'lucide-react';
 
 export default function HeaderMasterKPI({ 
   masterKPI, 
@@ -15,7 +15,8 @@ export default function HeaderMasterKPI({
   onConnectDB,
   onConnectExcel,
   activeView,
-  onChangeView
+  onChangeView,
+  onLogout
 }) {
   if (!masterKPI) return null;
 
@@ -70,6 +71,25 @@ export default function HeaderMasterKPI({
             <button className="btn-secondary" onClick={() => onChangeView('analytics')} style={{ border: '1px solid var(--accent-blue)', display: 'flex', alignItems: 'center', gap: '8px' }}>
               <Cpu size={18} color="var(--accent-blue)" />
               운영 분석 대시보드
+            </button>
+          )}
+
+          {onLogout && (
+            <button 
+              className="btn-secondary" 
+              onClick={onLogout} 
+              style={{ 
+                background: 'rgba(255, 8, 68, 0.1)', 
+                borderColor: 'rgba(255, 8, 68, 0.3)', 
+                color: '#ff4b72',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              title="로그아웃"
+            >
+              <LogOut size={16} />
+              로그아웃
             </button>
           )}
         </div>

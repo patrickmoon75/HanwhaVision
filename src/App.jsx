@@ -7,6 +7,7 @@ import SlottingSimulatorModal from './components/SlottingSimulatorModal';
 import ExceptionAlertBanner from './components/ExceptionAlertBanner';
 import PlannerSimulatorView from './components/PlannerSimulatorView';
 import WmsDoReceiverView from './components/WmsDoReceiverView';
+import LoginScreen from './components/LoginScreen';
 import { loadAndProcessData, processRawDatasets, fetchSupabaseData, fetchExcelData } from './services/dataProcessor';
 import * as XLSX from 'xlsx';
 import { Upload, Sparkles } from 'lucide-react';
@@ -16,6 +17,7 @@ const DEFAULT_RACK_PATH = 'c:\\Users\\bosel\\Desktop\\한화비전 분석 프로
 const DEFAULT_INVENTORY_PATH = 'c:\\Users\\bosel\\Desktop\\한화비전 분석 프로그램\\★창고데이터(분석용).xlsx';
 
 export default function App() {
+  const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem('rwcs_authenticated') === 'true');
   const [activeView, setActiveView] = useState('analytics'); // 'analytics' or 'wms_do'
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -26,6 +28,11 @@ export default function App() {
   const [dragActive, setDragActive] = useState(false);
   const [simPickingRows, setSimPickingRows] = useState([]);
   const [simYardIds, setSimYardIds] = useState(new Set());
+
+  const handleLogout = () => {
+    sessionStorage.removeItem('rwcs_authenticated');
+    setIsAuthenticated(false);
+  };
 
   const [rackFileInfo, setRackFileInfo] = useState({
     name: 'Rack_20260720_수정.xlsx',
@@ -339,6 +346,10 @@ export default function App() {
     }
   };
 
+  if (!isAuthenticated) {
+    return <LoginScreen onLoginSuccess={() => setIsAuthenticated(true)} />;
+  }
+
   if (loading) {
     return (
       <div className="loading-box">
@@ -409,6 +420,7 @@ export default function App() {
         onConnectExcel={handleConnectExcel}
         activeView={activeView}
         onChangeView={setActiveView}
+        onLogout={handleLogout}
       />
 
       {activeView === 'analytics' ? (
