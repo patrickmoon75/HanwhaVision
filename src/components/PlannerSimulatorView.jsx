@@ -3,7 +3,7 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ReferenceLine, ResponsiveContainer, Legend, Area, ComposedChart, Bar, BarChart, Cell, LabelList
 } from 'recharts';
-import { FlaskConical, Play, RotateCcw, ChevronDown, ChevronUp, TrendingUp, Info, X, Upload, FileSpreadsheet, Save, Trash2, FolderOpen } from 'lucide-react';
+import { FlaskConical, Play, RotateCcw, ChevronDown, ChevronUp, TrendingUp, Info, X, Upload, FileSpreadsheet, Save, Trash2, FolderOpen, Edit2 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { runPlannerSimulation } from '../services/plannerSimulator';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
@@ -237,6 +237,26 @@ export default function PlannerSimulatorView({
     } catch (err) {
       console.error('Failed to delete history item:', err);
       alert('삭제 실패: ' + err.message);
+    }
+  };
+
+  // 이력 메모 수정
+  const updateHistoryMemo = async (id, currentMemo) => {
+    if (!isSupabaseConfigured || !supabase) return;
+    const newMemo = prompt("수정할 메모 내용을 입력해 주세요:", currentMemo);
+    if (newMemo === null) return; // 취소
+    
+    try {
+      const { error } = await supabase
+        .from('simulation_history')
+        .update({ memo: newMemo.trim() || '이름 없음' })
+        .eq('id', id);
+      if (error) throw error;
+      alert("메모가 수정되었습니다.");
+      fetchHistory();
+    } catch (err) {
+      console.error('Failed to update history memo:', err);
+      alert('메모 수정 실패: ' + err.message);
     }
   };
 
@@ -976,7 +996,31 @@ export default function PlannerSimulatorView({
                                 minute: '2-digit'
                               })}
                             </td>
-                            <td style={{ padding: '10px 8px', fontWeight: 700, color: '#f1f5f9' }}>{item.memo}</td>
+                            <td style={{ padding: '10px 8px', fontWeight: 700, color: '#f1f5f9' }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span>{item.memo}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => updateHistoryMemo(item.id, item.memo)}
+                                  style={{
+                                    background: 'none',
+                                    border: 'none',
+                                    color: '#a78bfa',
+                                    cursor: 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    padding: '2px',
+                                    opacity: 0.6,
+                                    transition: 'opacity 0.2s, transform 0.2s'
+                                  }}
+                                  onMouseEnter={(e) => { e.currentTarget.style.opacity = '1'; e.currentTarget.style.transform = 'scale(1.15)'; }}
+                                  onMouseLeave={(e) => { e.currentTarget.style.opacity = '0.6'; e.currentTarget.style.transform = 'scale(1)'; }}
+                                  title="메모 수정"
+                                >
+                                  <Edit2 size={12} />
+                                </button>
+                              </div>
+                            </td>
                             <td style={{ padding: '10px 8px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>
                               {item.start_date.slice(5)} ~ {item.end_date.slice(5)}
                             </td>
