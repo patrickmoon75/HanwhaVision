@@ -22,6 +22,8 @@ export default function WmsDoReceiverView() {
   // Stats & Config
   const [totalOrders, setTotalOrders] = useState(0);
   const [todayOrders, setTodayOrders] = useState(0);
+  const [totalItems, setTotalItems] = useState(0);
+  const [avgItemsPerDay, setAvgItemsPerDay] = useState(0);
   const [lastTime, setLastTime] = useState('-');
   const [cronSchedule, setCronSchedule] = useState('설정되지 않음');
   const [scheduleTime, setScheduleTime] = useState('14:00');
@@ -96,6 +98,14 @@ export default function WmsDoReceiverView() {
       return dateKst === todayKst;
     }).length;
     setTodayOrders(todayCount);
+
+    // 아이템 통계 계산
+    const itemsSum = data.reduce((sum, d) => sum + (Number(d.pieces_to_pick) || 0), 0);
+    setTotalItems(itemsSum);
+
+    const uniqueDates = new Set(data.map(d => new Date(d.collected_at).toLocaleDateString('ko-KR')));
+    const totalDays = uniqueDates.size || 1;
+    setAvgItemsPerDay(itemsSum / totalDays);
 
     if (data.length > 0) {
       const latest = new Date(data[0].collected_at);
@@ -444,19 +454,29 @@ export default function WmsDoReceiverView() {
           </div>
           <div className="kpi-content">
             <span className="kpi-label">누적 수집된 주문 수</span>
-            <span className="kpi-value">{totalOrders.toLocaleString()} 건</span>
+            <span className="kpi-value" style={{ display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
+              <span>{totalOrders.toLocaleString()} 건</span>
+              <span style={{ fontSize: '1.15rem', color: 'var(--accent-green)', fontWeight: 800 }}>
+                (오늘 {todayOrders.toLocaleString()}건)
+              </span>
+            </span>
             <span className="kpi-sub">Supabase Database 누적</span>
           </div>
         </div>
 
         <div className="kpi-card glass-card" style={{ '--card-accent': 'var(--accent-green)' }}>
           <div className="kpi-icon-wrapper" style={{ color: 'var(--accent-green)' }}>
-            <CalendarCheck size={22} />
+            <FileSpreadsheet size={22} />
           </div>
           <div className="kpi-content">
-            <span className="kpi-label">오늘 수집된 주문 수</span>
-            <span className="kpi-value" style={{ color: 'var(--accent-green)' }}>{todayOrders.toLocaleString()} 건</span>
-            <span className="kpi-sub">오늘 자정(KST) 이후 수집 기준</span>
+            <span className="kpi-label">수집 아이템 통계</span>
+            <span className="kpi-value" style={{ color: 'var(--accent-green)', display: 'flex', alignItems: 'baseline', gap: '6px', flexWrap: 'wrap' }}>
+              <span>총 {totalItems.toLocaleString()} EA</span>
+              <span style={{ fontSize: '1.15rem', color: 'var(--text-primary)', fontWeight: 700 }}>
+                (일평균 {Math.round(avgItemsPerDay).toLocaleString()} EA)
+              </span>
+            </span>
+            <span className="kpi-sub">WMS 수집 품목 전체 수량 기준</span>
           </div>
         </div>
 

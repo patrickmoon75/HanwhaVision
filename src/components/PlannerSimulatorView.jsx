@@ -248,10 +248,37 @@ export default function PlannerSimulatorView({
         totalQty: r.totalQty,
         simYardQty: r.simYardQty,
         actualYardQty: r.actualYardQty,
+        actualPlanYardQty: r.actualPlanYardQty,
         plannedSkuCount: r.plannedSkuCount,
         totalSkuCount: r.totalSkuCount,
         pickOrderCount: r.pickOrderCount,
       }));
+  }, [simResults, startDate, endDate]);
+
+  // 3종 그래프별로 데이터가 있는 날만 추출하여 기간 평균 피킹율 계산 (가중평균: 총야드출고량 / 총전체출고량)
+  const periodAvgStats = useMemo(() => {
+    if (!simResults || simResults.length === 0) return { avgActual: '0.00', avgSim: '0.00', avgPlan: '0.00' };
+    const filteredResults = simResults.filter(r => r.date >= startDate && r.date <= endDate);
+
+    // 1. 실제 피킹율 평균
+    const actualValid = filteredResults.filter(r => r.actualRate !== null);
+    const totalActualYard = actualValid.reduce((s, r) => s + (r.actualYardQty || 0), 0);
+    const totalActualQty = actualValid.reduce((s, r) => s + (r.totalQty || 0), 0);
+    const avgActual = totalActualQty > 0 ? ((totalActualYard / totalActualQty) * 100).toFixed(2) : '0.00';
+
+    // 2. 알고리즘 시뮬 피킹율 평균
+    const simValid = filteredResults.filter(r => r.simRate !== null);
+    const totalSimYard = simValid.reduce((s, r) => s + (r.simYardQty || 0), 0);
+    const totalSimQty = simValid.reduce((s, r) => s + (r.totalQty || 0), 0);
+    const avgSim = totalSimQty > 0 ? ((totalSimYard / totalSimQty) * 100).toFixed(2) : '0.00';
+
+    // 3. 실제 배치계획 피킹율 평균
+    const planValid = filteredResults.filter(r => r.actualPlanRate !== null && r.actualPlanRate !== undefined);
+    const totalPlanYard = planValid.reduce((s, r) => s + (r.actualPlanYardQty || 0), 0);
+    const totalPlanQty = planValid.reduce((s, r) => s + (r.totalQty || 0), 0);
+    const avgPlan = totalPlanQty > 0 ? ((totalPlanYard / totalPlanQty) * 100).toFixed(2) : '0.00';
+
+    return { avgActual, avgSim, avgPlan };
   }, [simResults, startDate, endDate]);
 
   // 집계 통계 (조회 기간 startDate ~ endDate 로 필터링)
@@ -896,17 +923,26 @@ export default function PlannerSimulatorView({
                       border: `1px solid ${lineVisibility.actualRate ? '#00f2fe' : 'rgba(255,255,255,0.15)'}`,
                       color: lineVisibility.actualRate ? '#00f2fe' : '#64748b',
                       borderRadius: '6px',
-                      padding: '3px 9px',
+                      padding: '4px 10px',
                       cursor: 'pointer',
                       fontWeight: 600,
                       display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      transition: 'all 0.2s'
+                      flexDirection: 'column',
+                      alignItems: 'flex-start',
+                      gap: '2px',
+                      transition: 'all 0.2s',
+                      textAlign: 'left'
                     }}
                   >
-                    <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#00f2fe' }}></span>
-                    실제 피킹율
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#00f2fe' }}></span>
+                      실제 피킹율
+                    </div>
+                    {periodAvgStats && (
+                      <span style={{ fontSize: '0.8rem', marginLeft: '13px', fontWeight: 800 }}>
+                        (평균 {periodAvgStats.avgActual}%)
+                      </span>
+                    )}
                   </button>
 
                   <button
@@ -916,17 +952,26 @@ export default function PlannerSimulatorView({
                       border: `1px solid ${lineVisibility.simRate ? '#a78bfa' : 'rgba(255,255,255,0.15)'}`,
                       color: lineVisibility.simRate ? '#a78bfa' : '#64748b',
                       borderRadius: '6px',
-                      padding: '3px 9px',
+                      padding: '4px 10px',
                       cursor: 'pointer',
                       fontWeight: 600,
                       display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      transition: 'all 0.2s'
+                      flexDirection: 'column',
+                      alignItems: 'flex-start',
+                      gap: '2px',
+                      transition: 'all 0.2s',
+                      textAlign: 'left'
                     }}
                   >
-                    <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#a78bfa' }}></span>
-                    DO반영 알고리즘 시뮬 피킹율
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#a78bfa' }}></span>
+                      DO반영 알고리즘 시뮬 피킹율
+                    </div>
+                    {periodAvgStats && (
+                      <span style={{ fontSize: '0.8rem', marginLeft: '13px', fontWeight: 800 }}>
+                        (평균 {periodAvgStats.avgSim}%)
+                      </span>
+                    )}
                   </button>
 
                   <button
@@ -936,17 +981,26 @@ export default function PlannerSimulatorView({
                       border: `1px solid ${lineVisibility.actualPlanRate ? '#f59e0b' : 'rgba(255,255,255,0.15)'}`,
                       color: lineVisibility.actualPlanRate ? '#f59e0b' : '#64748b',
                       borderRadius: '6px',
-                      padding: '3px 9px',
+                      padding: '4px 10px',
                       cursor: 'pointer',
                       fontWeight: 600,
                       display: 'flex',
-                      alignItems: 'center',
-                      gap: '5px',
-                      transition: 'all 0.2s'
+                      flexDirection: 'column',
+                      alignItems: 'flex-start',
+                      gap: '2px',
+                      transition: 'all 0.2s',
+                      textAlign: 'left'
                     }}
                   >
-                    <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b' }}></span>
-                    실제 배치계획 피킹율
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+                      <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', background: '#f59e0b' }}></span>
+                      실제 배치계획 피킹율
+                    </div>
+                    {periodAvgStats && (
+                      <span style={{ fontSize: '0.8rem', marginLeft: '13px', fontWeight: 800 }}>
+                        (평균 {periodAvgStats.avgPlan}%)
+                      </span>
+                    )}
                   </button>
                 </div>
               </div>

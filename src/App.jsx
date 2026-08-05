@@ -214,6 +214,56 @@ export default function App() {
     }
   };
 
+  // 현재 활성화된 WMS 데이터 (Supabase 혹은 로컬 엑셀)를 XLSX 파일로 다운로드
+  const handleDownloadExcel = () => {
+    try {
+      if (!rawDatasets) {
+        alert("다운로드할 데이터가 존재하지 않습니다.");
+        return;
+      }
+
+      const wb = XLSX.utils.book_new();
+      let hasData = false;
+
+      if (rawDatasets.planRows && rawDatasets.planRows.length > 0) {
+        const wsPlan = XLSX.utils.json_to_sheet(rawDatasets.planRows);
+        XLSX.utils.book_append_sheet(wb, wsPlan, '배치계획');
+        hasData = true;
+      }
+      if (rawDatasets.missionRows && rawDatasets.missionRows.length > 0) {
+        const wsMission = XLSX.utils.json_to_sheet(rawDatasets.missionRows);
+        XLSX.utils.book_append_sheet(wb, wsMission, '미션로그');
+        hasData = true;
+      }
+      if (rawDatasets.inventoryRows && rawDatasets.inventoryRows.length > 0) {
+        const wsInv = XLSX.utils.json_to_sheet(rawDatasets.inventoryRows);
+        XLSX.utils.book_append_sheet(wb, wsInv, '재고현황');
+        hasData = true;
+      }
+      if (rawDatasets.pickingRows && rawDatasets.pickingRows.length > 0) {
+        const wsPick = XLSX.utils.json_to_sheet(rawDatasets.pickingRows);
+        XLSX.utils.book_append_sheet(wb, wsPick, '피킹오더');
+        hasData = true;
+      }
+      if (rawDatasets.pendingOrderRows && rawDatasets.pendingOrderRows.length > 0) {
+        const wsPending = XLSX.utils.json_to_sheet(rawDatasets.pendingOrderRows);
+        XLSX.utils.book_append_sheet(wb, wsPending, '미출고DO');
+        hasData = true;
+      }
+
+      if (!hasData) {
+        alert("시트에 작성할 유효한 데이터가 존재하지 않습니다.");
+        return;
+      }
+
+      const timestamp = new Date().toISOString().slice(0, 10);
+      XLSX.writeFile(wb, `WMS_DB_Data_${timestamp}.xlsx`);
+    } catch (err) {
+      console.error('Download failed:', err);
+      alert('엑셀 다운로드 중 오류가 발생했습니다: ' + err.message);
+    }
+  };
+
   // Drag & Drop / 통합 파일 업로드 파싱
   const handleDrop = async (e) => {
     e.preventDefault();
@@ -353,6 +403,7 @@ export default function App() {
         inventoryFileInfo={inventoryFileInfo}
         onReplaceRackFile={handleReplaceRackFile}
         onReplaceInventoryFile={handleReplaceInventoryFile}
+        onDownloadExcel={handleDownloadExcel}
         dataSource={data.dataSource || 'excel'}
         onConnectDB={handleConnectDB}
         onConnectExcel={handleConnectExcel}

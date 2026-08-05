@@ -1,5 +1,4 @@
-import React from 'react';
-import { ShieldAlert, Server, AlertTriangle, Layers, Calendar, Cpu, Database, FileSpreadsheet, FolderOpen, FileCheck } from 'lucide-react';
+import { ShieldAlert, Server, AlertTriangle, Layers, Calendar, Cpu, Database, FileSpreadsheet, FolderOpen, FileCheck, Download } from 'lucide-react';
 
 export default function HeaderMasterKPI({ 
   masterKPI, 
@@ -11,6 +10,7 @@ export default function HeaderMasterKPI({
   inventoryFileInfo,
   onReplaceRackFile,
   onReplaceInventoryFile,
+  onDownloadExcel,
   dataSource,
   onConnectDB,
   onConnectExcel,
@@ -220,6 +220,17 @@ export default function HeaderMasterKPI({
                 {inventoryFileInfo?.path || 'c:\\Users\\bosel\\Desktop\\한화비전 분석 프로그램\\창고데이터_수정.xlsx'}
               </div>
             </div>
+            {onDownloadExcel && (
+              <button 
+                type="button" 
+                className="btn-file-download" 
+                onClick={onDownloadExcel}
+                title="WMS 재고 및 피킹오더 데이터 다운로드 (XLSX)"
+              >
+                <Download size={14} />
+                <span>다운로드</span>
+              </button>
+            )}
             <label className="btn-file-change">
               <FolderOpen size={14} />
               <span>파일 교체</span>
