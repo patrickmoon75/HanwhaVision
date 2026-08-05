@@ -89,3 +89,18 @@ EXCEPTION
         RETURN NULL;
 END;
 $$;
+
+-- 5. Create simulation_history table
+CREATE TABLE IF NOT EXISTS public.simulation_history (
+    id BIGSERIAL PRIMARY KEY,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    memo TEXT,
+    config_json JSONB NOT NULL,
+    results_summary_json JSONB NOT NULL,
+    start_date TEXT NOT NULL,
+    end_date TEXT NOT NULL
+);
+
+-- Enable indexes for sorting by creation date
+CREATE INDEX IF NOT EXISTS idx_simulation_history_created_at ON public.simulation_history (created_at DESC);
+

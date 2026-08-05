@@ -1,11 +1,12 @@
-import React, { useState, useCallback, useMemo, useRef } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect } from 'react';
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip,
   ReferenceLine, ResponsiveContainer, Legend, Area, ComposedChart, Bar, BarChart, Cell, LabelList
 } from 'recharts';
-import { FlaskConical, Play, RotateCcw, ChevronDown, ChevronUp, TrendingUp, Info, X, Upload, FileSpreadsheet } from 'lucide-react';
+import { FlaskConical, Play, RotateCcw, ChevronDown, ChevronUp, TrendingUp, Info, X, Upload, FileSpreadsheet, Save, Trash2, FolderOpen } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import { runPlannerSimulation } from '../services/plannerSimulator';
+import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
 
 // ── 기본 Config (RWCS 고도화 설정값) ─────────────────────────────────
 const DEFAULT_CONFIG = {
@@ -120,7 +121,8 @@ export default function PlannerSimulatorView({
   rackRows,
   planRows,
   rawDatasets,
-  pendingOrderRows
+  pendingOrderRows,
+  dataSource
 }) {
   const [config, setConfig] = useState({ ...DEFAULT_CONFIG });
   const [lineVisibility, setLineVisibility] = useState({
@@ -143,6 +145,100 @@ export default function PlannerSimulatorView({
   const [customDoRows, setCustomDoRows] = useState(null); // 사용자가 직접 입력/업로드한 DO (pending_orders)
   const [customDoFileName, setCustomDoFileName] = useState('');
   const doFileInputRef = useRef(null);
+
+  // Supabase History States
+  const [history, setHistory] = useState([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+  const [savingHistory, setSavingHistory] = useState(false);
+  const [showHistoryPanel, setShowHistoryPanel] = useState(false);
+
+  // 이력 목록 조회
+  const fetchHistory = useCallback(async () => {
+    if (!isSupabaseConfigured || !supabase) return;
+    setLoadingHistory(true);
+    try {
+      const { data, error } = await supabase
+        .from('simulation_history')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setHistory(data || []);
+    } catch (err) {
+      console.error('Failed to fetch simulation history:', err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isSupabaseConfigured && supabase) {
+      fetchHistory();
+    }
+  }, [fetchHistory]);
+
+  // 시뮬레이션 설정 및 결과 저장
+  const saveCurrentSimulation = async () => {
+    if (!isSupabaseConfigured || !supabase) {
+      alert("Supabase 데이터베이스가 설정되지 않았습니다.");
+      return;
+    }
+    if (!stats) {
+      alert("저장할 시뮬레이션 결과가 없습니다. 먼저 시뮬레이션을 수행해 주세요.");
+      return;
+    }
+
+    const memo = prompt("시뮬레이션 설정을 식별할 메모를 입력해 주세요:", `시뮬레이션 - ${new Date().toLocaleDateString('ko-KR')}`);
+    if (memo === null) return; // 취소
+
+    setSavingHistory(true);
+    try {
+      const { error } = await supabase
+        .from('simulation_history')
+        .insert({
+          memo: memo.trim() || `시뮬레이션 - ${new Date().toLocaleDateString('ko-KR')}`,
+          config_json: config,
+          results_summary_json: stats,
+          start_date: startDate,
+          end_date: endDate
+        });
+      if (error) throw error;
+      alert("시뮬레이션 설정 및 결과가 성공적으로 저장되었습니다.");
+      fetchHistory();
+    } catch (err) {
+      console.error('Failed to save simulation history:', err);
+      alert('저장 실패: ' + err.message);
+    } finally {
+      setSavingHistory(false);
+    }
+  };
+
+  // 이력 설정 불러오기
+  const loadHistoryConfig = (historyItem) => {
+    if (!historyItem) return;
+    setConfig(historyItem.config_json);
+    if (onRangeChange) {
+      onRangeChange(historyItem.start_date, historyItem.end_date);
+    }
+    alert(`"${historyItem.memo}" 설정이 로드되었습니다.\n[시뮬레이션 실행] 버튼을 눌러 결과를 다시 계산할 수 있습니다.`);
+  };
+
+  // 이력 삭제
+  const deleteHistoryItem = async (id) => {
+    if (!isSupabaseConfigured || !supabase) return;
+    if (!confirm("해당 시뮬레이션 이력을 정말 삭제하시겠습니까?")) return;
+    try {
+      const { error } = await supabase
+        .from('simulation_history')
+        .delete()
+        .eq('id', id);
+      if (error) throw error;
+      alert("성공적으로 삭제되었습니다.");
+      fetchHistory();
+    } catch (err) {
+      console.error('Failed to delete history item:', err);
+      alert('삭제 실패: ' + err.message);
+    }
+  };
 
   const handleDoFileUpload = (e) => {
     const file = e.target.files?.[0];
@@ -788,6 +884,156 @@ export default function PlannerSimulatorView({
       {/* ── 시뮬 결과 ─────────────────────────────────────────────────── */}
       {simResults && stats && (
         <>
+          {/* Supabase 시뮬레이션 이력 제어 툴바 */}
+          {isSupabaseConfigured && (
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '10px', marginBottom: '16px', flexWrap: 'wrap' }}>
+              <button 
+                onClick={saveCurrentSimulation}
+                disabled={savingHistory}
+                className="btn-primary"
+                style={{ 
+                  padding: '6px 14px', 
+                  fontSize: '0.8rem', 
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  border: 'none',
+                  boxShadow: '0 2px 8px rgba(16, 185, 129, 0.2)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '6px',
+                  cursor: savingHistory ? 'not-allowed' : 'pointer'
+                }}
+              >
+                <Save size={14} />
+                <span>{savingHistory ? '저장 중...' : '시뮬레이션 이력 저장'}</span>
+              </button>
+              <button 
+                onClick={() => setShowHistoryPanel(v => !v)}
+                className="btn-secondary"
+                style={{ 
+                  padding: '6px 14px', 
+                  fontSize: '0.8rem', 
+                  display: 'flex', 
+                  alignItems: 'center', 
+                  gap: '6px',
+                  borderColor: 'rgba(167, 139, 250, 0.3)',
+                  color: '#a78bfa',
+                  cursor: 'pointer'
+                }}
+              >
+                <FolderOpen size={14} />
+                <span>저장된 이력 불러오기 ({history.length}건)</span>
+                {showHistoryPanel ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+              </button>
+            </div>
+          )}
+
+          {/* 이력 목록 패널 */}
+          {isSupabaseConfigured && showHistoryPanel && (
+            <div className="glass-card" style={{ 
+              padding: '20px', 
+              marginBottom: '20px', 
+              background: 'rgba(0,0,0,0.3)', 
+              border: '1px solid rgba(167, 139, 250, 0.2)',
+              borderRadius: '12px'
+            }}>
+              <h3 style={{ fontSize: '0.92rem', fontWeight: 700, color: '#a78bfa', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <FolderOpen size={16} />
+                Supabase 시뮬레이션 설정/결과 이력
+              </h3>
+              {loadingHistory ? (
+                <div style={{ padding: '30px', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  데이터베이스에서 이력을 가져오는 중...
+                </div>
+              ) : history.length === 0 ? (
+                <div style={{ padding: '30px', textAlign: 'center', fontSize: '0.85rem', color: 'var(--text-muted)' }}>
+                  저장된 시뮬레이션 이력이 없습니다.
+                </div>
+              ) : (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', fontSize: '0.82rem', borderCollapse: 'collapse', color: '#f1f5f9' }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(255,255,255,0.1)', color: 'var(--text-secondary)' }}>
+                        <th style={{ padding: '10px 8px', textAlign: 'left' }}>저장 일시</th>
+                        <th style={{ padding: '10px 8px', textAlign: 'left' }}>메모</th>
+                        <th style={{ padding: '10px 8px', textAlign: 'left' }}>분석 대상 기간</th>
+                        <th style={{ padding: '10px 8px', textAlign: 'center' }}>실제 평균</th>
+                        <th style={{ padding: '10px 8px', textAlign: 'center' }}>시뮬 평균</th>
+                        <th style={{ padding: '10px 8px', textAlign: 'center' }}>개선 효과</th>
+                        <th style={{ padding: '10px 8px', textAlign: 'center' }}>동작</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {history.map(item => {
+                        const summary = item.results_summary_json || {};
+                        const isPositive = Number(summary.avgDiff) >= 0;
+                        return (
+                          <tr key={item.id} style={{ borderBottom: '1px solid rgba(255,255,255,0.06)', transition: 'background-color 0.2s' }}>
+                            <td style={{ padding: '10px 8px', color: 'var(--text-muted)' }}>
+                              {new Date(item.created_at).toLocaleString('ko-KR', {
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                              })}
+                            </td>
+                            <td style={{ padding: '10px 8px', fontWeight: 700, color: '#f1f5f9' }}>{item.memo}</td>
+                            <td style={{ padding: '10px 8px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>
+                              {item.start_date.slice(5)} ~ {item.end_date.slice(5)}
+                            </td>
+                            <td style={{ padding: '10px 8px', textAlign: 'center', color: '#00f2fe', fontWeight: 600 }}>{summary.avgActual}%</td>
+                            <td style={{ padding: '10px 8px', textAlign: 'center', color: '#a78bfa', fontWeight: 600 }}>{summary.avgSim}%</td>
+                            <td style={{ 
+                              padding: '10px 8px', 
+                              textAlign: 'center', 
+                              color: isPositive ? '#4ade80' : '#ff0844', 
+                              fontWeight: 700 
+                            }}>
+                              {isPositive ? '+' : ''}{summary.avgDiff}%p
+                            </td>
+                            <td style={{ padding: '10px 8px', textAlign: 'center' }}>
+                              <div style={{ display: 'inline-flex', gap: '6px' }}>
+                                <button 
+                                  onClick={() => loadHistoryConfig(item)}
+                                  className="btn-secondary"
+                                  style={{ 
+                                    padding: '2px 8px', 
+                                    fontSize: '0.72rem', 
+                                    height: '24px', 
+                                    borderRadius: '4px',
+                                    borderColor: 'rgba(0, 242, 254, 0.4)',
+                                    color: 'var(--accent-cyan)',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  불러오기
+                                </button>
+                                <button 
+                                  onClick={() => deleteHistoryItem(item.id)}
+                                  className="btn-secondary"
+                                  style={{ 
+                                    padding: '2px 8px', 
+                                    fontSize: '0.72rem', 
+                                    height: '24px', 
+                                    borderRadius: '4px',
+                                    borderColor: 'rgba(239, 68, 68, 0.3)',
+                                    color: '#ef4444',
+                                    cursor: 'pointer'
+                                  }}
+                                >
+                                  삭제
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* KPI 요약 배지 */}
           <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap', marginBottom: '20px' }}>
             <div style={{

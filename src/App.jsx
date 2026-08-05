@@ -466,6 +466,7 @@ export default function App() {
             planRows={rawDatasets.planRows}
             rawDatasets={rawDatasets}
             pendingOrderRows={rawDatasets.pendingOrderRows}
+            dataSource={data.dataSource || 'excel'}
           />
         </>
       ) : (
