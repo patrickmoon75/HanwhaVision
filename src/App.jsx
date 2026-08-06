@@ -494,7 +494,12 @@ export default function App() {
     );
   }
 
-  const currentDateInfo = data.dailyAnalytics[selectedDate] || {};
+  const availableDates = (data && data.dates) ? data.dates : [];
+  const currentSelectedDate = (selectedDate && availableDates.includes(selectedDate))
+    ? selectedDate
+    : (availableDates[availableDates.length - 1] || selectedDate);
+
+  const currentDateInfo = (data && data.dailyAnalytics) ? (data.dailyAnalytics[currentSelectedDate] || {}) : {};
 
   // Filter Invalid Missions by Selected Date Range (startDate ~ endDate)
   const filteredInvalidMissions = (data.invalidMissions || []).filter(m => {
@@ -514,7 +519,7 @@ export default function App() {
       {/* 1. Header & Physical Master KPI */}
       <HeaderMasterKPI
         masterKPI={data.masterKPI}
-        selectedDate={selectedDate}
+        selectedDate={currentSelectedDate}
         dates={data.dates}
         onSelectDate={setSelectedDate}
         onOpenSimulator={() => setIsSimulatorOpen(true)}
