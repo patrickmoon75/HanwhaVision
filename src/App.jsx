@@ -39,6 +39,7 @@ export default function App() {
   const [showAutoLogoutWarn, setShowAutoLogoutWarn] = useState(false);
 
   const [skuAvgList, setSkuAvgList] = useState([]);
+  const [skuPeriodInfo, setSkuPeriodInfo] = useState({});
   const [isUpdatingSku, setIsUpdatingSku] = useState(false);
   const [rawDatasets, setRawDatasets] = useState({});
 
@@ -47,6 +48,7 @@ export default function App() {
     loadSavedSkuPalletAverages().then(res => {
       if (res && res.list) {
         setSkuAvgList(res.list);
+        if (res.periodInfo) setSkuPeriodInfo(res.periodInfo);
       }
     });
   }, []);
@@ -61,12 +63,14 @@ export default function App() {
     setIsUpdatingSku(true);
     try {
       const inventoryRows = rawDatasets.inventoryRows || [];
-      const { list, map } = calculateSkuPalletAverages(inventoryRows);
+      const pickingRows = rawDatasets.pickingRows || [];
+      const { list, map, periodInfo } = calculateSkuPalletAverages(inventoryRows, pickingRows);
       
-      await saveSkuPalletAverages(list);
+      await saveSkuPalletAverages(list, periodInfo);
       setSkuAvgList(list);
+      setSkuPeriodInfo(periodInfo);
 
-      alert(`✅ 6월 1일부터 현재까지의 재고 데이터 기준 SKU 파레트 평균 적재량이 성공적으로 업데이트 및 저장되었습니다.\n(총 ${list.length}개 SKU 연산 완료)`);
+      alert(`✅ ${periodInfo.minDate} ~ ${periodInfo.maxDate} (총 ${periodInfo.totalDaysCount}일분) 재고 및 피킹오더 기준 SKU 통계가 성공적으로 업데이트 및 저장되었습니다.\n(총 ${list.length}개 SKU 연산 완료)`);
     } catch (err) {
       console.error("SKU update failed:", err);
       alert("SKU 파레트 평균 적재량 업데이트 중 오류가 발생하였습니다.");
@@ -78,13 +82,16 @@ export default function App() {
   // 'SKU다운로드' 핸들러
   const handleDownloadSkuPalletExcel = () => {
     let listToExport = skuAvgList;
-    if (!listToExport || listToExport.length === 0) {
+    let periodToExport = skuPeriodInfo;
+
+    if (!listToExport || listToExport.length === 0 || !periodToExport || !periodToExport.minDate) {
       if (rawDatasets && rawDatasets.inventoryRows && rawDatasets.inventoryRows.length > 0) {
-        const calculated = calculateSkuPalletAverages(rawDatasets.inventoryRows);
+        const calculated = calculateSkuPalletAverages(rawDatasets.inventoryRows, rawDatasets.pickingRows || []);
         listToExport = calculated.list;
+        periodToExport = calculated.periodInfo;
       }
     }
-    downloadSkuPalletExcel(listToExport);
+    downloadSkuPalletExcel(listToExport, periodToExport);
   };
 
   const sessionIdRef = useRef(null);           // Supabase access_logs row id
