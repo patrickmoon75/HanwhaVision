@@ -148,13 +148,6 @@ export default function App() {
     isDefault: true
   });
 
-  const [rawDatasets, setRawDatasets] = useState({
-    rackRows: [],
-    planRows: [],
-    missionRows: [],
-    inventoryRows: [],
-    pickingRows: []
-  });
 
   useEffect(() => {
     async function initData() {
