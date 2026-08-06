@@ -449,25 +449,7 @@ export default function PlannerSimulatorView({
         }}>BETA</span>
       </div>
 
-      {/* 안내 배너 */}
-      <div style={{
-        background: 'rgba(167,139,250,0.08)',
-        border: '1px solid rgba(167,139,250,0.2)',
-        borderRadius: '8px',
-        padding: '8px 14px',
-        fontSize: '0.8rem',
-        color: '#cbd5e1',
-        display: 'flex',
-        alignItems: 'flex-start',
-        gap: '8px',
-        marginBottom: '16px',
-      }}>
-        <Info size={14} color="#a78bfa" style={{ flexShrink: 0, marginTop: '2px' }} />
-        <span>
-          <strong style={{ color: '#a78bfa' }}>낙관적 상한선 시뮬레이션</strong>: 배치계획에 포함된 SKU의 당일 피킹오더 전량이 야드에서 처리 가능하다는 조건으로 계산합니다.
-          실제 결과는 재고 가용성 및 로봇 미션 완료율에 따라 달라질 수 있습니다.
-        </span>
-      </div>
+
 
       {/* ── Config 패널 ─────────────────────────────────────────────── */}
       <div style={{
