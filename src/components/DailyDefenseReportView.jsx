@@ -13,7 +13,7 @@ export default function DailyDefenseReportView({ selectedDate, dateInfo }) {
       label: '야드플랜 미실행',
       subLabel: `Yard Plan Loss: ${dateInfo.yardPlanLossRate ?? 0}%`,
       rate: parseFloat(dateInfo.yardPlanLossRate) || 0,
-      body: `전날(${dateInfo.prevDate}) 지게차 완료 미션 부족으로 인해 당일 야드플랜이 충분히 실행되지 못하였습니다. 이는 RWCS 시스템 및 운영 양측의 공동 책임 영역으로, 전체 피킹율 손실 중 가장 큰 비율(${dateInfo.yardPlanLossRate ?? 0}%)을 차지하는 핵심 요인입니다.`
+      body: `전날(${dateInfo.prevDate}) 지게차 완료 미션 부족으로 야드 빈 셀이 ${(Math.max(0, (dateInfo.availYard || 805) - (dateInfo.occupiedYardCount || 0))).toLocaleString()} / ${(dateInfo.availYard || 805).toLocaleString()}셀 (${(((Math.max(0, (dateInfo.availYard || 805) - (dateInfo.occupiedYardCount || 0))) / (dateInfo.availYard || 805)) * 100).toFixed(1)}%) 발생하였습니다. 당일 야드플랜이 충분히 실행되지 못하여 전체 피킹율 손실 중 가장 큰 비율(${dateInfo.yardPlanLossRate ?? 0}%)을 차지하는 핵심 요인입니다.`
     },
     {
       label: '현장 자재 적치 관리 부실',

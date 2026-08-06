@@ -36,6 +36,11 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
   const blockedQty = dateInfo.blockedRackPickQty ?? 0;
   const totalQty   = dateInfo.totalPickQty ?? 0;
 
+  const availYardCell = dateInfo.availYard || 805;
+  const occupiedYardCell = dateInfo.occupiedYardCount || 0;
+  const emptyYardCell = Math.max(0, availYardCell - occupiedYardCell);
+  const emptyYardRate = ((emptyYardCell / availYardCell) * 100).toFixed(1);
+
   const CustomPieTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
@@ -57,7 +62,7 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
         description = algoDynamicDesc;
       } else if (name.includes('4.') || name.includes('야드플랜')) {
         title = '4. 야드플랜 미실행 (RWCS/운영)';
-        description = '전날 완료된 지게차 미션 수 부족으로 인해 당일 출고를 위한 야드 적재 재고가 미리 채워지지 않아 야드가 비게 됨으로써 연쇄적으로 발생한 피킹율 하락 손실입니다.';
+        description = `전날 완료된 지게차 미션 수 부족으로 야드 빈 셀이 ${emptyYardCell.toLocaleString()} / ${availYardCell.toLocaleString()}셀 (${emptyYardRate}%) 발생하여 야드가 비게 됨으로써 발생한 피킹 지연 손실입니다.`;
       }
 
       return (
@@ -223,11 +228,17 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
             }}
           >
             <span style={{ color: '#ffd600', fontWeight: 600 }}>● 4. 야드플랜 미실행 (RWCS/운영)</span>
-            <strong style={{ fontSize: '0.95rem' }}>{dateInfo.yardPlanLossRate ?? 0}%</strong>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '1px' }}>
+              <strong style={{ fontSize: '0.95rem' }}>{dateInfo.yardPlanLossRate ?? 0}%</strong>
+              <span style={{ fontSize: '0.72rem', color: '#ffe066' }}>{emptyYardCell.toLocaleString()} / {availYardCell.toLocaleString()}셀 ({emptyYardRate}%)</span>
+            </div>
             <div className="custom-tooltip-box" style={{ borderColor: '#ffd600' }}>
               <strong style={{ color: '#ffd600', fontSize: '0.85rem' }}>4. 야드플랜 미실행 (RWCS/운영)</strong>
               <p style={{ marginTop: '6px', fontSize: '0.78rem', color: '#cbd5e1', lineHeight: '1.4', fontWeight: 'normal' }}>
-                전날 지게차 로봇의 완료 미션 수가 부족(또는 미실행)하여 야드에 적재 재고가 채워지지 않아 발생한 피킹 지연 요인입니다.
+                야드 빈 셀 수: <strong style={{ color: '#ffe066' }}>{emptyYardCell.toLocaleString()}셀</strong> / 전체 <strong style={{ color: '#fff' }}>{availYardCell.toLocaleString()}셀</strong><br />
+                야드 공실 비율: <strong style={{ color: '#ffe066' }}>{emptyYardRate}%</strong><br />
+                손실율: {dateInfo.yardPlanLossRate ?? 0}%<br /><br />
+                전날 지게차 로봇의 완료 미션 수가 부족(또는 미실행)하여 야드에 적재 재고가 채워지지 않아 빈 셀이 발생하고, 연쇄적으로 피킹 지연이 발생하였습니다.
               </p>
             </div>
           </div>
