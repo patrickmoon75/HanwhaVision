@@ -229,8 +229,8 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
           >
             <span style={{ color: '#ffd600', fontWeight: 600 }}>● 4. 야드플랜 미실행 (RWCS/운영)</span>
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '1px' }}>
-              <strong style={{ fontSize: '0.95rem' }}>{dateInfo.yardPlanLossRate ?? 0}%</strong>
-              <span style={{ fontSize: '0.72rem', color: '#ffe066' }}>{emptyYardCell.toLocaleString()} / {availYardCell.toLocaleString()}셀 ({emptyYardRate}%)</span>
+              <strong style={{ fontSize: '0.95rem' }}>{emptyYardRate}%</strong>
+              <span style={{ fontSize: '0.72rem', color: '#ffe066' }}>{emptyYardCell.toLocaleString()} / {availYardCell.toLocaleString()}셀</span>
             </div>
             <div className="custom-tooltip-box" style={{ borderColor: '#ffd600' }}>
               <strong style={{ color: '#ffd600', fontSize: '0.85rem' }}>4. 야드플랜 미실행 (RWCS/운영)</strong>
