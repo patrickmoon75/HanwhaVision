@@ -204,6 +204,18 @@ export default function LoginScreen({ onLoginSuccess }) {
             시스템 접속하기
           </button>
         </form>
+
+        {/* Novatek Logo at the bottom of login card */}
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', marginTop: '24px' }}>
+          <img 
+            src="/images/Novatek_logo.png" 
+            alt="Novatek 로고" 
+            style={{ 
+              height: '32px', 
+              objectFit: 'contain'
+            }} 
+          />
+        </div>
       </div>
     </div>
   );
