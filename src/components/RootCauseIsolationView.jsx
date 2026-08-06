@@ -41,6 +41,14 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
   const emptyYardCell = Math.max(0, availYardCell - occupiedYardCell);
   const emptyYardRate = ((emptyYardCell / availYardCell) * 100).toFixed(1);
 
+  const totalMissions = dateInfo.totalMissionCount || (dateInfo.dayMissions ? dateInfo.dayMissions.length : 0);
+  const completedMissions = dateInfo.completedCount || 0;
+  const softResetCount = dateInfo.softResetCount || 0;
+  const abortedCount = dateInfo.abortedCount || 0;
+  const canceledCount = dateInfo.canceledCount || 0;
+  const deletedCount = dateInfo.deletedCount || 0;
+  const completedRate = totalMissions > 0 ? ((completedMissions / totalMissions) * 100).toFixed(1) : '0.0';
+
   const CustomPieTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
@@ -56,7 +64,7 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
         description = `진입 불가 구역(Blocked 랙)에서 출고 지시된 수량 ${blockedQty.toLocaleString()}개 / 전체 피킹 수량 ${totalQty.toLocaleString()}개 기준 비율입니다. 무인지게차(AGF)가 물리적으로 접근하지 못해 발생한 피킹 손실로, 고객사 측의 차단 구역 해제 조치가 필요합니다.`;
       } else if (name.includes('2.') || name.includes('파레트') || name.includes('소프트리셋')) {
         title = '2. 소프트리셋 실시';
-        description = '고단 랙 피킹 시 파레트 흔들림 감지 및 적치 제어로 인한 로봇 안전 센서 정상 보호 동작(Soft reset)이 발생한 운영 손실입니다.';
+        description = `총 미션 ${totalMissions}건 중 Soft Reset ${softResetCount}건 발생. 전체 미션 중 ${completedRate}% 정상 실행되었습니다.`;
       } else if (name.includes('3.') || name.includes('배치계획')) {
         title = '3. 배치계획 오차 (RWCS)';
         description = algoDynamicDesc;
@@ -98,7 +106,7 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
         <div className="section-title" style={{ fontSize: '1rem', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
             <PieIcon color="var(--accent-rose)" size={20} />
-            <span>4대 책임 소재 분리 (상대값임)</span>
+            <span>4대 책임 소재 분리</span>
           </div>
           {/* 우상단: 선택 날짜 + 피킹율 */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', background: 'rgba(255, 255, 255, 0.05)', padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
@@ -184,11 +192,16 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
             }}
           >
             <span style={{ color: '#ffb199', fontWeight: 600 }}>● 2. 소프트리셋 실시</span>
-            <strong style={{ fontSize: '0.95rem' }}>{dateInfo.opErrorLossRate}%</strong>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '1px' }}>
+              <strong style={{ fontSize: '0.95rem' }}>{softResetCount}건 / {completedRate}%</strong>
+              <span style={{ fontSize: '0.72rem', color: '#ffb199' }}>Soft Reset {softResetCount}건 (수행율 {completedRate}%)</span>
+            </div>
             <div className="custom-tooltip-box" style={{ borderColor: '#ffb199' }}>
               <strong style={{ color: '#ffb199', fontSize: '0.85rem' }}>2. 소프트리셋 실시</strong>
               <p style={{ marginTop: '6px', fontSize: '0.78rem', color: '#cbd5e1', lineHeight: '1.4', fontWeight: 'normal' }}>
-                고단 랙 피킹 작업 시 로봇 안전 센서 정상 보호 동작(Soft reset)이 발생하여 일시 정지 후 자동 리셋된 운영 손실입니다.
+                총 미션: <strong style={{ color: '#fff' }}>{totalMissions}건</strong> (완료: {completedMissions}건, Soft Reset: <strong style={{ color: '#ffb199' }}>{softResetCount}건</strong>, Aborted: {abortedCount}건, Canceled: {canceledCount}건, Deleted: {deletedCount}건)<br />
+                정상 실행율: <strong style={{ color: '#4ade80' }}>{completedRate}%</strong> ({completedMissions}/{totalMissions}건 완료)<br /><br />
+                야간 배치 작업 중 발생한 미션 현황입니다. 전체 미션 중 {completedRate}%가 정상 실행되었습니다.
               </p>
             </div>
           </div>

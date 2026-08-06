@@ -7,6 +7,14 @@ import { formatWithDayOfWeek } from '../services/dataProcessor';
 export default function DailyDefenseReportView({ selectedDate, dateInfo }) {
   if (!dateInfo) return null;
 
+  const totalMissions = dateInfo.totalMissionCount || (dateInfo.dayMissions ? dateInfo.dayMissions.length : 0);
+  const completedMissions = dateInfo.completedCount || 0;
+  const softResetCount = dateInfo.softResetCount || 0;
+  const abortedCount = dateInfo.abortedCount || 0;
+  const canceledCount = dateInfo.canceledCount || 0;
+  const deletedCount = dateInfo.deletedCount || 0;
+  const completedRate = totalMissions > 0 ? ((completedMissions / totalMissions) * 100).toFixed(1) : '0.0';
+
   // 악영향 요인을 영향도 크기 순으로 정렬
   const factors = [
     {
@@ -17,9 +25,9 @@ export default function DailyDefenseReportView({ selectedDate, dateInfo }) {
     },
     {
       label: '소프트리셋 실시',
-      subLabel: `Operational Error Loss: ${dateInfo.opErrorLossRate}%`,
+      subLabel: `총 미션 ${totalMissions}건, Soft Reset ${softResetCount}건, 수행율 ${completedRate}%`,
       rate: parseFloat(dateInfo.opErrorLossRate) || 0,
-      body: `야간 전진 배치 작업 중, 4~5단 고단 랙 피킹 시 로봇 안전 센서 정상 보호 동작(Soft reset)이 총 ${dateInfo.softResetCount}건 발생하였습니다.`
+      body: `야간 배치 작업 중 총 미션 ${totalMissions}건, Soft Reset ${softResetCount}건, Aborted ${abortedCount}건, Canceled ${canceledCount}건, Deleted ${deletedCount}건이 발생하였습니다.\n   전체미션 중에서 ${completedRate}% 정상 실행되었습니다.`
     },
     {
       label: '현장 인프라 진입 차단',
@@ -49,7 +57,7 @@ export default function DailyDefenseReportView({ selectedDate, dateInfo }) {
       ``
     ]).flat(),
     `■ 종합 의견:`,
-    `   금일 피킹율 하락은 RWCS 알고리즘 자체의 오류나 성능 한계에서 비롯된 것이 아닙니다. 가장 큰 원인은 ①전날 지게차 완료 미션 부족에 따른 야드플랜 미실행(${dateInfo.yardPlanLossRate ?? 0}%)이며, 이어서 ②로봇 안전 센서 동작에 따른 소프트리셋 실시(${dateInfo.opErrorLossRate}%)와 ③물리적 인프라 차단으로 인한 AGF 접근 불가(${dateInfo.infraLossRate}%)가 복합적으로 작용하였습니다. RWCS 시스템은 이러한 제약 조건 속에서도 차선순위 미션 자동 전환으로 야드 만재율을 정상 유지하며 시스템의 역할을 충실히 수행하였습니다. 향후 피킹율 개선을 위해서는 전날 야드플랜 완료 미션 목표 달성, 소프트리셋 발생 단수 감시 강화, 진입 차단 구역의 단계적 해제가 우선 과제로 판단됩니다.`
+    `   금일 피킹율 하락은 RWCS 알고리즘 자체의 오류나 성능 한계에서 비롯된 것이 아닙니다. 가장 큰 원인은 ①전날 지게차 완료 미션 부족에 따른 야드플랜 미실행(${dateInfo.yardPlanLossRate ?? 0}%)이며, 이어서 ②소프트리셋 실시(총 미션 ${totalMissions}건 중 Soft Reset ${softResetCount}건, 정상 실행율 ${completedRate}%)와 ③물리적 인프라 차단으로 인한 AGF 접근 불가(${dateInfo.infraLossRate}%)가 복합적으로 작용하였습니다. RWCS 시스템은 이러한 제약 조건 속에서도 차선순위 미션 자동 전환으로 야드 만재율을 정상 유지하며 시스템의 역할을 충실히 수행하였습니다. 향후 피킹율 개선을 위해서는 전날 야드플랜 완료 미션 목표 달성, 소프트리셋 발생 단수 감시 강화, 진입 차단 구역의 단계적 해제가 우선 과제로 판단됩니다.`
   ];
 
   const reportText = reportLines.join('\n');
