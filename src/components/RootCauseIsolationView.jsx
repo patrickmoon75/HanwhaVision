@@ -104,9 +104,14 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
       {/* 1. Pie Chart: 4대 원인 분리 */}
       <div className="glass-card">
         <div className="section-title" style={{ fontSize: '1rem', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', width: '100%' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <PieIcon color="var(--accent-rose)" size={20} />
-            <span>4대 책임 소재 분리</span>
+          <div style={{ display: 'flex', flexDirection: 'column' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <PieIcon color="var(--accent-rose)" size={20} />
+              <span>4대 책임 소재 분리</span>
+            </div>
+            <span style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', marginTop: '4px', fontWeight: 600 }}>
+              {formatWithDayOfWeek(dateInfo.pickingDate)}
+            </span>
           </div>
           {/* 우상단: 선택 날짜 + 피킹율 */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', background: 'rgba(255, 255, 255, 0.05)', padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>

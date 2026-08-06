@@ -587,8 +587,18 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
 
     // ==========================================
     // 배치계획 적중율 (Plan Hit Rate / Accuracy) 계산
-    // 비교: 전일 배치계획(dayPlans) vs 당일 피킹오더(dayPickings)
+    // 비교: 전일/당일 배치계획(dayPlans) vs 당일 피킹오더(dayPickings)
     // ==========================================
+    const parsePlanDateHelper = (planIdStr) => {
+      if (!planIdStr) return null;
+      const str = String(planIdStr).replace(/[^0-9]/g, '');
+      if (str.length >= 8) {
+        return `${str.substring(0, 4)}-${str.substring(4, 6)}-${str.substring(6, 8)}`;
+      }
+      return null;
+    };
+
+    // 당일 피킹 오더 품목 및 수량
     const pickItemSet = new Set();
     const pickItemQtyMap = new Map();
     let pickTotalQtySum = 0;
@@ -603,7 +613,13 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
       pickTotalQtySum += qty;
     });
 
-    const pickItemCount = pickItemSet.size; // 당일 피킹오더 품목수
+    const pickItemCount = pickItemSet.size;
+
+    // 해당 날짜(당일 또는 전일) 배치계획 데이터
+    const targetPlans = (dayPlans && dayPlans.length > 0) ? dayPlans : (rawPlanRows || []).filter(r => {
+      const pDate = parsePlanDateHelper(r.PlanId) || r.CreateTime || r.Date;
+      return pDate && (pDate.includes(pickingDate) || pDate.includes(prevDate));
+    });
 
     const planItemSet = new Set();
     const planItemQtyMap = new Map();
@@ -613,28 +629,28 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
     const yardPlanItemQtyMap = new Map();
     let yardPlanTotalQtySum = 0;
 
-    dayPlans.forEach(pl => {
-      const item = pl.ItemId || pl.SKU || pl.ItemCode;
-      const qty = Number(pl.TargetPalletQuantity) || Number(pl.TargetQty) || Number(pl.Qty) || 1;
-      const loc = pl.LocationId || '';
+    targetPlans.forEach(pl => {
+      const item = pl.ItemId || pl.SKU || pl.ItemCode || pl.Items;
+      const qty = Number(pl.TargetPalletQuantity) || Number(pl.Quantity) || Number(pl.TargetQty) || 1;
+      const loc = pl.LocationId || pl.ToLocation || pl.FromLocation || '';
       
       if (item) {
-        planItemSet.add(item);
-        planItemQtyMap.set(item, (planItemQtyMap.get(item) || 0) + qty);
+        const itemStr = String(item).trim();
+        planItemSet.add(itemStr);
+        planItemQtyMap.set(itemStr, (planItemQtyMap.get(itemStr) || 0) + qty);
         planTotalQtySum += qty;
 
-        // 야드 셀 여부 확인 (yardSet 사용)
         const isYardLoc = yardSet ? yardSet.has(loc) : false;
         if (isYardLoc) {
-          yardPlanItemSet.add(item);
-          yardPlanItemQtyMap.set(item, (yardPlanItemQtyMap.get(item) || 0) + qty);
+          yardPlanItemSet.add(itemStr);
+          yardPlanItemQtyMap.set(itemStr, (yardPlanItemQtyMap.get(itemStr) || 0) + qty);
           yardPlanTotalQtySum += qty;
         }
       }
     });
 
-    const planItemCount = planItemSet.size; // 배치계획 품목수
-    const yardPlanItemCount = yardPlanItemSet.size; // 야드 배치계획 품목수
+    const planItemCount = planItemSet.size;
+    const yardPlanItemCount = yardPlanItemSet.size;
 
     // 1) 전체 관점 적중율 계산
     let hitItemCount = 0;
