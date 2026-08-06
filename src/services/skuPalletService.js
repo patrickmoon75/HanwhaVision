@@ -150,7 +150,7 @@ export async function loadSavedSkuPalletAverages() {
  */
 export function downloadSkuPalletExcel(skuAvgList = []) {
   if (!skuAvgList || skuAvgList.length === 0) {
-    alert("다운로드할 SKU 평균 적재량 데이터가 없습니다. 먼저 'SKU업데이트'를 실행해 주세요.");
+    alert("다운로드할 SKU 평균 적재량 데이터가 없습니다. 대시보드 데이터 로드 후 다시 시도해 주세요.");
     return;
   }
 
@@ -165,21 +165,30 @@ export function downloadSkuPalletExcel(skuAvgList = []) {
 
   const worksheet = XLSX.utils.json_to_sheet(exportData);
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, worksheet, 'SKU별_파레트_평균적재량');
+  XLSX.utils.book_append_sheet(workbook, worksheet, 'SKU_Avg_Pallet_Qty');
 
   const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  const filename = `SKU별_파레트_평균적재량_${todayStr}.xlsx`;
+  const filename = `SKU_Pallet_Avg_Qty_${todayStr}.xlsx`;
 
-  // 브라우저 표준 엑셀 다운로드 버퍼 생성 및 안전 다운로드 처리
-  const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
-  const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  document.body.removeChild(a);
-  URL.revokeObjectURL(url);
+  try {
+    XLSX.writeFile(workbook, filename);
+  } catch (err) {
+    console.warn("XLSX.writeFile fallback to binary blob:", err);
+    const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'binary' });
+    function s2ab(s) {
+      const buf = new ArrayBuffer(s.length);
+      const view = new Uint8Array(buf);
+      for (let i = 0; i < s.length; i++) view[i] = s.charCodeAt(i) & 0xFF;
+      return buf;
+    }
+    const blob = new Blob([s2ab(wbout)], { type: 'application/octet-stream' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
 }

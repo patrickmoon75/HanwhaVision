@@ -77,7 +77,14 @@ export default function App() {
 
   // 'SKU다운로드' 핸들러
   const handleDownloadSkuPalletExcel = () => {
-    downloadSkuPalletExcel(skuAvgList);
+    let listToExport = skuAvgList;
+    if (!listToExport || listToExport.length === 0) {
+      if (rawDatasets && rawDatasets.inventoryRows && rawDatasets.inventoryRows.length > 0) {
+        const calculated = calculateSkuPalletAverages(rawDatasets.inventoryRows);
+        listToExport = calculated.list;
+      }
+    }
+    downloadSkuPalletExcel(listToExport);
   };
 
   const sessionIdRef = useRef(null);           // Supabase access_logs row id
