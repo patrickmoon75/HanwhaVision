@@ -617,11 +617,16 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
 
     const pickItemCount = pickItemSet.size;
 
-    // 해당 날짜(당일 또는 전일) 배치계획 데이터
-    const targetPlans = (dayPlans && dayPlans.length > 0) ? dayPlans : (rawPlanRows || []).filter(r => {
-      const pDate = parsePlanDateHelper(r.PlanId) || r.CreateTime || r.Date;
+    // 해당 날짜(당일 또는 전일) 배치계획 데이터 탐색
+    let targetPlans = (dayPlans && dayPlans.length > 0) ? dayPlans : (planRows || []).filter(r => {
+      const pDate = parsePlanDateHelper(r.PlanId) || r.CreateTime || r.Date || '';
       return pDate && (pDate.includes(pickingDate) || pDate.includes(prevDate));
     });
+
+    // 매칭되는 특정 날짜 계획이 없는 경우 전체 planRows를 모수로 활용
+    if (!targetPlans || targetPlans.length === 0) {
+      targetPlans = planRows || [];
+    }
 
     const planItemSet = new Set();
     const planItemQtyMap = new Map();
@@ -642,7 +647,7 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
         planItemQtyMap.set(itemStr, (planItemQtyMap.get(itemStr) || 0) + qty);
         planTotalQtySum += qty;
 
-        const isYardLoc = yardSet ? yardSet.has(loc) : false;
+        const isYardLoc = loc ? (yardSet ? yardSet.has(loc) : false) : true;
         if (isYardLoc) {
           yardPlanItemSet.add(itemStr);
           yardPlanItemQtyMap.set(itemStr, (yardPlanItemQtyMap.get(itemStr) || 0) + qty);
