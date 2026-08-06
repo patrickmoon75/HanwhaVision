@@ -420,11 +420,13 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
     const availRackPickQty = Math.max(0, totalPickQty - yardPickQty - blockedRackPickQty);
     const availPickRate = totalPickQty > 0 ? ((availRackPickQty / totalPickQty) * 100).toFixed(2) : '0.00';
 
-    // Day N Plans
+    // Day N Plans (전일 또는 당일 배치계획 DB 매칭)
     const dayPlans = planRows.filter(p => {
-      if (!p.PlanId) return false;
-      const m = String(p.PlanId).match(/A(\d{8})/);
-      return m && m[1] === compactPrevDate;
+      const planIdStr = String(p.PlanId || p.planId || '').trim();
+      if (!planIdStr) return false;
+      const m = planIdStr.match(/[A-Za-z]?(\d{8})/);
+      if (!m) return false;
+      return m[1] === compactPrevDate || m[1] === compactPickingDate;
     });
 
     // Day Missions (StartTime 또는 CreateTime 기준 당일 매칭)
