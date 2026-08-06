@@ -585,6 +585,89 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
     //     이제 ①②③ 모두 totalPickQty 기준으로 환산되었으므로 의미 있는 잔여값 ✅
     const algoLossRate = Math.max(0, Number((totalLossRate - infraLossRate - opErrorLossRate - yardPlanLossRate).toFixed(2)));
 
+    // ==========================================
+    // 배치계획 적중율 (Plan Hit Rate / Accuracy) 계산
+    // 비교: 전일 배치계획(dayPlans) vs 당일 피킹오더(dayPickings)
+    // ==========================================
+    const pickItemSet = new Set();
+    const pickItemQtyMap = new Map();
+    let pickTotalQtySum = 0;
+    
+    dayPickings.forEach(pk => {
+      const item = pk.ItemId || pk.SKU || pk.ItemCode;
+      const qty = Number(pk.ItemQty) || Number(pk.Qty) || 0;
+      if (item) {
+        pickItemSet.add(item);
+        pickItemQtyMap.set(item, (pickItemQtyMap.get(item) || 0) + qty);
+      }
+      pickTotalQtySum += qty;
+    });
+
+    const pickItemCount = pickItemSet.size; // 당일 피킹오더 품목수
+
+    const planItemSet = new Set();
+    const planItemQtyMap = new Map();
+    let planTotalQtySum = 0;
+
+    const yardPlanItemSet = new Set();
+    const yardPlanItemQtyMap = new Map();
+    let yardPlanTotalQtySum = 0;
+
+    dayPlans.forEach(pl => {
+      const item = pl.ItemId || pl.SKU || pl.ItemCode;
+      const qty = Number(pl.TargetPalletQuantity) || Number(pl.TargetQty) || Number(pl.Qty) || 1;
+      const loc = pl.LocationId || '';
+      
+      if (item) {
+        planItemSet.add(item);
+        planItemQtyMap.set(item, (planItemQtyMap.get(item) || 0) + qty);
+        planTotalQtySum += qty;
+
+        // 야드 셀 여부 확인 (yardSet 사용)
+        const isYardLoc = yardSet ? yardSet.has(loc) : false;
+        if (isYardLoc) {
+          yardPlanItemSet.add(item);
+          yardPlanItemQtyMap.set(item, (yardPlanItemQtyMap.get(item) || 0) + qty);
+          yardPlanTotalQtySum += qty;
+        }
+      }
+    });
+
+    const planItemCount = planItemSet.size; // 배치계획 품목수
+    const yardPlanItemCount = yardPlanItemSet.size; // 야드 배치계획 품목수
+
+    // 1) 전체 관점 적중율 계산
+    let hitItemCount = 0;
+    let hitQtySum = 0;
+
+    pickItemSet.forEach(item => {
+      if (planItemSet.has(item)) {
+        hitItemCount += 1;
+        const pQty = pickItemQtyMap.get(item) || 0;
+        const plQty = planItemQtyMap.get(item) || 0;
+        hitQtySum += Math.min(pQty, plQty);
+      }
+    });
+
+    const itemAccuracy = pickItemCount > 0 ? Number(((hitItemCount / pickItemCount) * 100).toFixed(1)) : 0.0;
+    const qtyAccuracy = pickTotalQtySum > 0 ? Number(((hitQtySum / pickTotalQtySum) * 100).toFixed(1)) : 0.0;
+
+    // 2) 야드 관점 (805개 셀 모수) 적중율 계산
+    let yardHitItemCount = 0;
+    let yardHitQtySum = 0;
+
+    pickItemSet.forEach(item => {
+      if (yardPlanItemSet.has(item)) {
+        yardHitItemCount += 1;
+        const pQty = pickItemQtyMap.get(item) || 0;
+        const yPlQty = yardPlanItemQtyMap.get(item) || 0;
+        yardHitQtySum += Math.min(pQty, yPlQty);
+      }
+    });
+
+    const yardItemAccuracy = pickItemCount > 0 ? Number(((yardHitItemCount / pickItemCount) * 100).toFixed(1)) : 0.0;
+    const yardQtyAccuracy = pickTotalQtySum > 0 ? Number(((yardHitQtySum / pickTotalQtySum) * 100).toFixed(1)) : 0.0;
+
 
     // 전일(D-1): 현재 dateInfo의 dayMissions = 전날 밤 실행 미션
     // 야드 만재율과 동일한 논리: completedCount 등이 전일 미션
@@ -645,6 +728,21 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
       yardOccupancyRate,
       occupiedYardCount,
       yardOccupancyRateToday,
+      // 배치계획 적중율 관련 지표
+      planItemCount,
+      pickItemCount,
+      hitItemCount,
+      itemAccuracy,
+      planTotalQtySum,
+      pickTotalQtySum,
+      hitQtySum,
+      qtyAccuracy,
+      yardPlanItemCount,
+      yardHitItemCount,
+      yardItemAccuracy,
+      yardPlanTotalQtySum,
+      yardHitQtySum,
+      yardQtyAccuracy,
       occupiedYardCountToday,
       availYard,
       dayPlans,

@@ -36,9 +36,15 @@ export default function DailyDefenseReportView({ selectedDate, dateInfo }) {
       body: `당일 출고 요청된 전체 피킹 수량 ${(dateInfo.totalPickQty ?? 0).toLocaleString()}개 중 ${(dateInfo.blockedRackPickQty ?? 0).toLocaleString()}개(${dateInfo.infraLossRate}%)가 접근불가 차단 랙(Blocked == TRUE)에서 지시된 물량으로, 무인지게차(AGF)의 물리적 접근이 불가능했습니다. (차단 랙 전체 차단율 33.7%)`
     },
     {
+      label: '배치계획 적중율 분석',
+      subLabel: `품목 적중율: ${dateInfo.itemAccuracy ?? 0}%, 수량 적중율: ${dateInfo.qtyAccuracy ?? 0}%`,
+      rate: parseFloat(dateInfo.algoLossRate) || 0,
+      body: `전일 배치계획과 당일 피킹오더를 비교한 결과, 전체 품목 적중율 ${dateInfo.itemAccuracy ?? 0}% (배치계획 ${dateInfo.planItemCount ?? 0} / 피킹 ${dateInfo.pickItemCount ?? 0} SKU), 전체 수량 적중율 ${dateInfo.qtyAccuracy ?? 0}%로 분석되었습니다. (805개 야드 셀 모수 기준: 야드 품목 적중율 ${dateInfo.yardItemAccuracy ?? 0}%, 야드 수량 적중율 ${dateInfo.yardQtyAccuracy ?? 0}%)`
+    },
+    {
       label: 'RWCS 시스템 복구 및 만재율 입증',
       subLabel: `Fallback & Occupancy Rate: ${dateInfo.yardOccupancyRate}%`,
-      rate: 0, // 시스템 복구는 긍정 요소이므로 항상 마지막 배치
+      rate: -1, // 시스템 복구는 긍정 요소이므로 항상 마지막 배치
       body: `로봇 제어 시스템(RWCS)은 에러 속에서도 즉시 차선순위(Next Best) 미션을 자동 가동하여, 출고 직전 야드 만재율을 ${dateInfo.yardOccupancyRate}% (${dateInfo.occupiedYardCount}/${dateInfo.availYard} 셀)로 유지하며 시스템 역할을 완수하였습니다.`
     }
   ].sort((a, b) => b.rate - a.rate);

@@ -11,7 +11,7 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
   const totalLoss = (100 - Number(dateInfo.yardPickingRate || 0)).toFixed(2);
   const prevMissions = dateInfo.prevCompletedMissions ?? 0;
   const pickQty = dateInfo.totalPickQty ?? 0;
-  const algoDynamicDesc = `${dateInfo.pickingDate}의 전체 피킹 손실(${totalLoss}%) 중, 당일 실제 발생한 인프라 차단 손실(${dateInfo.infraLossRate}%)과 현장 파레트 에러(${dateInfo.opErrorLossRate}%), 그리고 전날(${dateInfo.prevDate}) 지게차 완료 미션 부족(${prevMissions}건 / 기준 150건 대비 부족)에 따른 야드플랜 미실행 요인(${dateInfo.yardPlanLossRate ?? 0}%)을 제하고 남은 순수한 배치 계획상 오차(${dateInfo.algoLossRate}%)입니다. 당일 피킹 지시 오더 ${pickQty}건 및 전일 지게차 적치 데이터를 종합 분석하여 최종 판정하였습니다.`;
+  const algoDynamicDesc = `${dateInfo.pickingDate} 당일 피킹오더 대비 전일 배치계획의 전체 품목 적중율은 ${dateInfo.itemAccuracy ?? 0}%, 수량 적중율은 ${dateInfo.qtyAccuracy ?? 0}%입니다. (805개 야드 셀 모수 기준: 야드 품목 적중율 ${dateInfo.yardItemAccuracy ?? 0}%, 야드 수량 적중율 ${dateInfo.yardQtyAccuracy ?? 0}%)`;
 
   const level5Loss = Number(dateInfo.level5LossRate || 0);
   const infraLoss = Math.max(0, Number(dateInfo.infraLossRate || dateInfo.blockedPickRate || 0) - level5Loss);
@@ -219,11 +219,16 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
             }}
           >
             <span style={{ color: '#00f2fe', fontWeight: 600 }}>● 3. 배치계획 오차 (RWCS)</span>
-            <strong style={{ fontSize: '0.95rem' }}>{dateInfo.algoLossRate}%</strong>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '1px' }}>
+              <strong style={{ fontSize: '0.95rem' }}>품목 {dateInfo.itemAccuracy ?? 0}% / 수량 {dateInfo.qtyAccuracy ?? 0}%</strong>
+              <span style={{ fontSize: '0.72rem', color: '#00f2fe' }}>야드: 품목 {dateInfo.yardItemAccuracy ?? 0}% / 수량 {dateInfo.yardQtyAccuracy ?? 0}%</span>
+            </div>
             <div className="custom-tooltip-box" style={{ borderColor: '#00f2fe' }}>
               <strong style={{ color: '#00f2fe', fontSize: '0.85rem' }}>3. 배치계획 오차 (RWCS)</strong>
               <p style={{ marginTop: '6px', fontSize: '0.78rem', color: '#cbd5e1', lineHeight: '1.4', fontWeight: 'normal' }}>
-                {algoDynamicDesc}
+                전체 관점: 품목 적중율 <strong style={{ color: '#00f2fe' }}>{dateInfo.itemAccuracy ?? 0}%</strong> ({dateInfo.hitItemCount ?? 0}/{dateInfo.pickItemCount ?? 0} SKU), 수량 적중율 <strong style={{ color: '#4ade80' }}>{dateInfo.qtyAccuracy ?? 0}%</strong> ({(dateInfo.hitQtySum ?? 0).toLocaleString()}/{(dateInfo.pickTotalQtySum ?? 0).toLocaleString()}개)<br />
+                야드 관점 (805셀): 품목 적중율 <strong style={{ color: '#00f2fe' }}>{dateInfo.yardItemAccuracy ?? 0}%</strong> ({dateInfo.yardHitItemCount ?? 0}/{dateInfo.pickItemCount ?? 0} SKU), 수량 적중율 <strong style={{ color: '#4ade80' }}>{dateInfo.yardQtyAccuracy ?? 0}%</strong> ({(dateInfo.yardHitQtySum ?? 0).toLocaleString()}/{(dateInfo.pickTotalQtySum ?? 0).toLocaleString()}개)<br /><br />
+                전일 배치계획과 당일 피킹오더를 비교하여 배치계획의 신뢰성을 나타내는 지표입니다.
               </p>
             </div>
           </div>
@@ -469,6 +474,66 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
               </div>
             );
           })()}
+
+          {/* ── 배치계획 적중율 섹션 (신설) ── */}
+          <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '10px' }}>
+            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-cyan)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <BarChart2 size={15} color="var(--accent-cyan)" />
+              <span>배치계획 적중율</span>
+            </div>
+
+            <div style={{ display: 'flex', gap: '10px' }}>
+              {/* 1) 전체 관점 */}
+              <div style={{ flex: 1, background: 'rgba(255, 255, 255, 0.02)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
+                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#94a3b8', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '3px', marginBottom: '6px' }}>
+                  🌐 전체 관점
+                </div>
+                <div style={{ marginBottom: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                    <span>품목적중율</span>
+                    <strong style={{ color: '#00f2fe', fontSize: '0.85rem' }}>{dateInfo.itemAccuracy ?? 0}%</strong>
+                  </div>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                    배치계획 {dateInfo.planItemCount ?? 0} / 피킹 {dateInfo.pickItemCount ?? 0} SKU
+                  </span>
+                </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                    <span>수량적중율</span>
+                    <strong style={{ color: '#4ade80', fontSize: '0.85rem' }}>{dateInfo.qtyAccuracy ?? 0}%</strong>
+                  </div>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                    배치계획 {(dateInfo.planTotalQtySum ?? 0).toLocaleString()} / 피킹 {(dateInfo.pickTotalQtySum ?? 0).toLocaleString()}개
+                  </span>
+                </div>
+              </div>
+
+              {/* 2) 야드 관점 (805셀 모수) */}
+              <div style={{ flex: 1, background: 'rgba(0, 242, 254, 0.02)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(0, 242, 254, 0.12)' }}>
+                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--accent-cyan)', borderBottom: '1px solid rgba(0, 242, 254, 0.15)', paddingBottom: '3px', marginBottom: '6px' }}>
+                  🎯 야드 관점 (805셀 모수)
+                </div>
+                <div style={{ marginBottom: '6px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                    <span>야드 품목적중율</span>
+                    <strong style={{ color: '#00f2fe', fontSize: '0.85rem' }}>{dateInfo.yardItemAccuracy ?? 0}%</strong>
+                  </div>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                    야드계획 {dateInfo.yardPlanItemCount ?? 0} / 피킹 {dateInfo.pickItemCount ?? 0} SKU
+                  </span>
+                </div>
+                <div>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
+                    <span>야드 수량적중율</span>
+                    <strong style={{ color: '#4ade80', fontSize: '0.85rem' }}>{dateInfo.yardQtyAccuracy ?? 0}%</strong>
+                  </div>
+                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                    야드계획 {(dateInfo.yardPlanTotalQtySum ?? 0).toLocaleString()} / 피킹 {(dateInfo.pickTotalQtySum ?? 0).toLocaleString()}개
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
 
 
