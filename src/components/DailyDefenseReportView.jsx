@@ -32,7 +32,7 @@ export default function DailyDefenseReportView({ selectedDate, dateInfo }) {
     `2. 야드 만재율 (${dateInfo.yardOccupancyRate}%):`,
     `야드 만재율은 ${dateInfo.yardOccupancyRate}% (${occupiedYardCell.toLocaleString()}/${availYardCell.toLocaleString()} 셀) 입니다.`,
     ``,
-    `3. 소프트리셋 실시 (총 미션 ${totalMissions}건, Soft Reset ${softResetCount}건, 수행율 ${completedRate}%):`,
+    `3. 미션 및 수행율 (총 미션 ${totalMissions}건, Soft Reset ${softResetCount}건, 수행율 ${completedRate}%):`,
     `야간 배치 작업 중 총 미션 ${totalMissions}건, Soft Reset ${softResetCount}건, Aborted ${abortedCount}건, Canceled ${canceledCount}건, Deleted ${deletedCount}건이 발생하였습니다.`,
     `전체미션 중에서 ${completedRate}% 정상 실행되었습니다.`,
     ``,
