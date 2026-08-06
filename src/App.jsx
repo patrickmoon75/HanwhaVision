@@ -69,6 +69,17 @@ export default function App() {
     autoLogoutTimerRef.current = setTimeout(() => performLogout('auto'), AUTO_LOGOUT_MS);
   }, [isAuthenticated, performLogout]);
 
+  // 브라우저/탭 종료 시 미종료 세션 로그아웃 마감 시도
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (sessionIdRef.current) {
+        logLogout(sessionIdRef.current, 'browser_close');
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload);
+  }, []);
+
   // 인증된 동안 활동 이벤트 감지
   useEffect(() => {
     if (!isAuthenticated) return;

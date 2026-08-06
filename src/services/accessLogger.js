@@ -1,11 +1,37 @@
-﻿import { supabase, isSupabaseConfigured } from './supabaseClient';
+import { supabase, isSupabaseConfigured } from './supabaseClient';
 
 export async function logLogin(username) {
   if (!isSupabaseConfigured || !supabase) return null;
   try {
+    const now = new Date();
+    const nowIso = now.toISOString();
+
+    // 동일 사용자의 미종료(logout_time IS NULL) 세션이 있다면 자동 마감 처리
+    const { data: openSessions } = await supabase
+      .from('access_logs')
+      .select('id, login_time')
+      .eq('username', username)
+      .is('logout_time', null);
+
+    if (openSessions && openSessions.length > 0) {
+      for (const sess of openSessions) {
+        const loginTime = new Date(sess.login_time);
+        const durationSeconds = Math.max(0, Math.round((now - loginTime) / 1000));
+        await supabase
+          .from('access_logs')
+          .update({
+            logout_time: nowIso,
+            duration_seconds: durationSeconds,
+            logout_type: 'auto_closed'
+          })
+          .eq('id', sess.id);
+      }
+    }
+
+    // 신규 세션 생성
     const { data, error } = await supabase
       .from('access_logs')
-      .insert([{ username, login_time: new Date().toISOString(), logout_type: 'active' }])
+      .insert([{ username, login_time: nowIso, logout_type: 'active' }])
       .select('id')
       .single();
     if (error) throw error;
