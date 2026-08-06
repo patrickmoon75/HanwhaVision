@@ -19,7 +19,7 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
   const pieData = [
     { name: '1. 5단 갇힘 손실 (Level 5 Hard Blocked, 고객사 100% 책임)', value: Number(level5Loss.toFixed(2)), color: '#ef4444' },
     { name: '2. 1~4단 인프라 차단 손실 (고객사 책임)', value: Number(infraLoss.toFixed(2)), color: '#ff0844' },
-    { name: '3. 현장 파레트 부실 (고객사 책임)', value: dateInfo.opErrorLossRate, color: '#ffb199' },
+    { name: '3. 소프트리셋 실시 (운영/장비)', value: dateInfo.opErrorLossRate, color: '#ffb199' },
     { name: '4. 배치계획 오차 (RWCS 영역)', value: dateInfo.algoLossRate, color: '#00f2fe' },
     { name: '5. 야드플랜 미실행 (RWCS/운영 책임)', value: dateInfo.yardPlanLossRate ?? 0, color: '#ffd600' }
   ];
@@ -54,9 +54,9 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
       if (name.includes('1.') || name.includes('인프라')) {
         title = '1. 인프라 차단 손실 (고객사)';
         description = `진입 불가 구역(Blocked 랙)에서 출고 지시된 수량 ${blockedQty.toLocaleString()}개 / 전체 피킹 수량 ${totalQty.toLocaleString()}개 기준 비율입니다. 무인지게차(AGF)가 물리적으로 접근하지 못해 발생한 피킹 손실로, 고객사 측의 차단 구역 해제 조치가 필요합니다.`;
-      } else if (name.includes('2.') || name.includes('파레트')) {
-        title = '2. 현장 파레트 부실 (고객사)';
-        description = '파레트 적치 비뚤어짐이나 흔들림이 감지되어 AGF 로봇 센서가 안전 모드로 정지 후 자동 리셋(Soft Reset)되어 발생한 시간 손실입니다. 파레트 품질 정비가 요구됩니다.';
+      } else if (name.includes('2.') || name.includes('파레트') || name.includes('소프트리셋')) {
+        title = '2. 소프트리셋 실시';
+        description = '고단 랙 피킹 시 파레트 흔들림 감지 및 적치 제어로 인한 로봇 안전 센서 정상 보호 동작(Soft reset)이 발생한 운영 손실입니다.';
       } else if (name.includes('3.') || name.includes('배치계획')) {
         title = '3. 배치계획 오차 (RWCS)';
         description = algoDynamicDesc;
@@ -171,7 +171,7 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
             </div>
           </div>
 
-          {/* 2. 현장 파레트 부실 */}
+          {/* 2. 소프트리셋 실시 */}
           <div 
             className="tooltip-trigger"
             style={{ 
@@ -183,12 +183,12 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
               padding: '4px 0'
             }}
           >
-            <span style={{ color: '#ffb199', fontWeight: 600 }}>● 2. 현장 파레트 부실 (고객사)</span>
+            <span style={{ color: '#ffb199', fontWeight: 600 }}>● 2. 소프트리셋 실시</span>
             <strong style={{ fontSize: '0.95rem' }}>{dateInfo.opErrorLossRate}%</strong>
             <div className="custom-tooltip-box" style={{ borderColor: '#ffb199' }}>
-              <strong style={{ color: '#ffb199', fontSize: '0.85rem' }}>2. 현장 파레트 부실 (고객사)</strong>
+              <strong style={{ color: '#ffb199', fontSize: '0.85rem' }}>2. 소프트리셋 실시</strong>
               <p style={{ marginTop: '6px', fontSize: '0.78rem', color: '#cbd5e1', lineHeight: '1.4', fontWeight: 'normal' }}>
-                파레트 적치가 비뚤어지거나 흔들림이 감지되어 AGF 로봇 센서가 작동(Soft Reset)하고 일시 대기한 운영 손실입니다. 현장 파레트 적치 품질 개선이 필요합니다.
+                고단 랙 피킹 작업 시 로봇 안전 센서 정상 보호 동작(Soft reset)이 발생하여 일시 정지 후 자동 리셋된 운영 손실입니다.
               </p>
             </div>
           </div>
