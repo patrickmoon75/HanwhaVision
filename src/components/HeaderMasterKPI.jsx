@@ -28,7 +28,7 @@ export default function HeaderMasterKPI({
 
   return (
     <header className="header-bar glass-card">
-      <div className="header-top">
+      <div className="header-top" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%', marginBottom: '12px' }}>
         <div className="brand-section">
           <img 
             src="/images/Hanwha_logo.jpg" 
@@ -49,68 +49,9 @@ export default function HeaderMasterKPI({
             </p>
           </div>
         </div>
-      </div>
 
-      {/* 컨트롤 줄: 좌측(날짜·버튼) | 우측(접속자·로그·로그아웃) */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
-
-        {/* ── 좌측 그룹 ── */}
-        <div className="date-selector-group">
-          <Calendar size={18} color="var(--accent-cyan)" />
-          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>분석 일자 (Day N+1):</span>
-          <select value={selectedDate} onChange={(e) => onSelectDate(e.target.value)}>
-            {dates.map(d => (
-              <option key={d} value={d} style={{ background: '#111827', color: '#fff' }}>
-                {formatWithDayOfWeek(d)} {d === '2026-06-29' ? '⚠️ (피킹율 급락일)' : ''}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <button className="btn-primary" onClick={onOpenSimulator}>
-          <Cpu size={18} />
-          슬로팅 보정 시뮬레이터
-        </button>
-
-        {activeView === 'analytics' ? (
-          <button className="btn-secondary" onClick={() => onChangeView('wms_do')} style={{ border: '1px solid var(--accent-cyan)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Database size={18} color="var(--accent-cyan)" />
-            WMS 수집 제어판
-          </button>
-        ) : (
-          <button className="btn-secondary" onClick={() => onChangeView('analytics')} style={{ border: '1px solid var(--accent-blue)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Cpu size={18} color="var(--accent-blue)" />
-            운영 분석 대시보드
-          </button>
-        )}
-
-        {/* ── SKU별 파레트 평균 적재량 관리 버튼 그룹 (신설) ── */}
-        <button 
-          className="btn-secondary" 
-          onClick={onUpdateSkuPalletAvg}
-          disabled={isUpdatingSku}
-          title="6월 1일부터 현재까지의 재고 데이터를 이용하여 SKU별 파레트 평균 적재량을 업데이트하고 DB/캐시에 저장합니다"
-          style={{ border: '1px solid #3b82f6', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px' }}
-        >
-          <RefreshCw size={16} className={isUpdatingSku ? 'spin' : ''} />
-          {isUpdatingSku ? 'SKU계산중...' : 'SKU업데이트'}
-        </button>
-
-        <button 
-          className="btn-secondary" 
-          onClick={onDownloadSkuPalletExcel}
-          title="계산된 SKU별 파레트 평균 적재량 데이터 엑셀 파일 다운로드"
-          style={{ border: '1px solid #10b981', color: '#34d399', display: 'flex', alignItems: 'center', gap: '6px' }}
-        >
-          <FileSpreadsheet size={16} />
-          SKU다운로드
-        </button>
-
-        {/* ── 구분선 ── */}
-        <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.15)', margin: '0 4px' }} />
-
-        {/* ── 우측 그룹 (자동 우측 정렬) ── */}
-        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
+        {/* ── 상단 우측: 접속자 · 접속로그보기 · 로그아웃 ── */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           {username && (
             <div style={{
               fontSize: '0.85rem',
@@ -165,6 +106,62 @@ export default function HeaderMasterKPI({
             </button>
           )}
         </div>
+      </div>
+
+      {/* 컨트롤 줄: 날짜 · 시뮬레이터 · WMS · SKU업데이트 · SKU다운로드 */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
+
+        {/* ── 좌측 그룹 ── */}
+        <div className="date-selector-group">
+          <Calendar size={18} color="var(--accent-cyan)" />
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>분석 일자 (Day N+1):</span>
+          <select value={selectedDate} onChange={(e) => onSelectDate(e.target.value)}>
+            {dates.map(d => (
+              <option key={d} value={d} style={{ background: '#111827', color: '#fff' }}>
+                {formatWithDayOfWeek(d)} {d === '2026-06-29' ? '⚠️ (피킹율 급락일)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <button className="btn-primary" onClick={onOpenSimulator}>
+          <Cpu size={18} />
+          슬로팅 보정 시뮬레이터
+        </button>
+
+        {activeView === 'analytics' ? (
+          <button className="btn-secondary" onClick={() => onChangeView('wms_do')} style={{ border: '1px solid var(--accent-cyan)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Database size={18} color="var(--accent-cyan)" />
+            WMS 수집 제어판
+          </button>
+        ) : (
+          <button className="btn-secondary" onClick={() => onChangeView('analytics')} style={{ border: '1px solid var(--accent-blue)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Cpu size={18} color="var(--accent-blue)" />
+            운영 분석 대시보드
+          </button>
+        )}
+
+        {/* ── SKU별 파레트 평균 적재량 관리 버튼 그룹 ── */}
+        <button 
+          className="btn-secondary" 
+          onClick={onUpdateSkuPalletAvg}
+          disabled={isUpdatingSku}
+          title="6월 1일부터 현재까지의 재고 데이터를 이용하여 SKU별 파레트 평균 적재량을 업데이트하고 DB/캐시에 저장합니다"
+          style={{ border: '1px solid #3b82f6', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          <RefreshCw size={16} className={isUpdatingSku ? 'spin' : ''} />
+          {isUpdatingSku ? 'SKU계산중...' : 'SKU업데이트'}
+        </button>
+
+        <button 
+          className="btn-secondary" 
+          onClick={onDownloadSkuPalletExcel}
+          title="계산된 SKU별 파레트 평균 적재량 데이터 엑셀 파일 다운로드"
+          style={{ border: '1px solid #10b981', color: '#34d399', display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          <FileSpreadsheet size={16} />
+          SKU다운로드
+        </button>
       </div>
 
       {/* File Status & Source File Switcher Bar */}
