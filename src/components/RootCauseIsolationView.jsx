@@ -33,6 +33,9 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
     { level: '5단 (고단)', prevCount: dateInfo.prevLevelCounts?.[5] ?? 0, currCount: dateInfo.levelCounts?.[5] ?? 0 }
   ];
 
+  const blockedQty = dateInfo.blockedRackPickQty ?? 0;
+  const totalQty   = dateInfo.totalPickQty ?? 0;
+
   const CustomPieTooltip = ({ active, payload }) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
@@ -45,7 +48,7 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
       
       if (name.includes('1.') || name.includes('인프라')) {
         title = '1. 인프라 차단 손실 (고객사)';
-        description = '진입 불가 구역(Blocked 랙)에 적치된 물량 때문에 무인지게차(AGF)가 물리적으로 접근하지 못해 발생한 피킹 손실입니다. 고객사 측의 차단 구역 해제 조치가 필요합니다.';
+        description = `진입 불가 구역(Blocked 랙)에서 출고 지시된 수량 ${blockedQty.toLocaleString()}개 / 전체 피킹 수량 ${totalQty.toLocaleString()}개 기준 비율입니다. 무인지게차(AGF)가 물리적으로 접근하지 못해 발생한 피킹 손실로, 고객사 측의 차단 구역 해제 조치가 필요합니다.`;
       } else if (name.includes('2.') || name.includes('파레트')) {
         title = '2. 현장 파레트 부실 (고객사)';
         description = '파레트 적치 비뚤어짐이나 흔들림이 감지되어 AGF 로봇 센서가 안전 모드로 정지 후 자동 리셋(Soft Reset)되어 발생한 시간 손실입니다. 파레트 품질 정비가 요구됩니다.';
@@ -65,7 +68,7 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
           padding: '12px 16px',
           boxShadow: '0 10px 25px rgba(0,0,0,0.5)',
           color: '#fff',
-          maxWidth: '280px',
+          maxWidth: '300px',
           whiteSpace: 'normal',
           wordBreak: 'keep-all',
           lineHeight: 1.4
@@ -148,11 +151,17 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
             }}
           >
             <span style={{ color: '#ff0844', fontWeight: 600 }}>● 1. 인프라 차단 손실 (고객사)</span>
-            <strong style={{ fontSize: '0.95rem' }}>{dateInfo.infraLossRate}%</strong>
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '1px' }}>
+              <strong style={{ fontSize: '0.95rem' }}>{dateInfo.infraLossRate}%</strong>
+              <span style={{ fontSize: '0.72rem', color: '#ff8888' }}>{blockedQty.toLocaleString()} / {totalQty.toLocaleString()}개</span>
+            </div>
             <div className="custom-tooltip-box" style={{ borderColor: '#ff0844' }}>
               <strong style={{ color: '#ff0844', fontSize: '0.85rem' }}>1. 인프라 차단 손실 (고객사)</strong>
               <p style={{ marginTop: '6px', fontSize: '0.78rem', color: '#cbd5e1', lineHeight: '1.4', fontWeight: 'normal' }}>
-                진입 불가 구역(Blocked 랙)에 적치된 물량 때문에 무인지게차(AGF)가 물리적으로 접근하지 못해 발생한 피킹 손실입니다. 고객사 측의 차단 구역 해제 조치가 필요합니다.
+                접근불가 랙(Blocked)에서 출고 지시된 수량: <strong style={{ color: '#ff8888' }}>{blockedQty.toLocaleString()}개</strong><br />
+                당일 전체 피킹 수량: <strong style={{ color: '#fff' }}>{totalQty.toLocaleString()}개</strong><br />
+                비율: {blockedQty.toLocaleString()} ÷ {totalQty.toLocaleString()} = {dateInfo.infraLossRate}%<br /><br />
+                무인지게차(AGF)가 물리적으로 접근하지 못한 차단 구역 출고 분량입니다. 고객사 측의 차단 구역 해제 조치가 필요합니다.
               </p>
             </div>
           </div>

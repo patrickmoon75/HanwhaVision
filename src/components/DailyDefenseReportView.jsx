@@ -1,5 +1,5 @@
 import React from 'react';
-import { FileText, Download, ShieldCheck, Printer } from 'lucide-react';
+import { FileText, Download } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
 import { formatWithDayOfWeek } from '../services/dataProcessor';
@@ -7,26 +7,56 @@ import { formatWithDayOfWeek } from '../services/dataProcessor';
 export default function DailyDefenseReportView({ selectedDate, dateInfo }) {
   if (!dateInfo) return null;
 
-  // 서술형 방어 리포트 자동 생성 텍스트 (기획서 4.3항 요구사항 준수)
-  const reportText = `[RWCS 운영 결과 분석 및 대고객 방어 리포트 - ${formatWithDayOfWeek(selectedDate)}]
+  // 악영향 요인을 영향도 크기 순으로 정렬
+  const factors = [
+    {
+      label: '야드플랜 미실행',
+      subLabel: `Yard Plan Loss: ${dateInfo.yardPlanLossRate ?? 0}%`,
+      rate: parseFloat(dateInfo.yardPlanLossRate) || 0,
+      body: `전날(${dateInfo.prevDate}) 지게차 완료 미션 부족으로 인해 당일 야드플랜이 충분히 실행되지 못하였습니다. 이는 RWCS 시스템 및 운영 양측의 공동 책임 영역으로, 전체 피킹율 손실 중 가장 큰 비율(${dateInfo.yardPlanLossRate ?? 0}%)을 차지하는 핵심 요인입니다.`
+    },
+    {
+      label: '현장 자재 적치 관리 부실',
+      subLabel: `Operational Error Loss: ${dateInfo.opErrorLossRate}%`,
+      rate: parseFloat(dateInfo.opErrorLossRate) || 0,
+      body: `야간 전진 배치 작업 중, 4~5단 고단 랙 피킹 시 파레트 흔들림 및 적치 불량으로 인한 로봇 안전 센서 정상 보호 동작(Soft reset)이 총 ${dateInfo.softResetCount}건 발생하였습니다. 이는 로봇 하드웨어 문제가 아닌 현장 관리 부실에 기인한 손실입니다.`
+    },
+    {
+      label: '현장 인프라 진입 차단',
+      subLabel: `Infrastructure Loss: ${dateInfo.infraLossRate}%`,
+      rate: parseFloat(dateInfo.infraLossRate) || 0,
+      body: `당일 출고 요청된 전체 피킹 수량 ${(dateInfo.totalPickQty ?? 0).toLocaleString()}개 중 ${(dateInfo.blockedRackPickQty ?? 0).toLocaleString()}개(${dateInfo.infraLossRate}%)가 접근불가 차단 랙(Blocked == TRUE)에서 지시된 물량으로, 무인지게차(AGF)의 물리적 접근이 불가능했습니다. (차단 랙 전체 차단율 33.7%)`
+    },
+    {
+      label: 'RWCS 시스템 복구 및 만재율 입증',
+      subLabel: `Fallback & Occupancy Rate: ${dateInfo.yardOccupancyRate}%`,
+      rate: 0, // 시스템 복구는 긍정 요소이므로 항상 마지막 배치
+      body: `로봇 제어 시스템(RWCS)은 에러 속에서도 즉시 차선순위(Next Best) 미션을 자동 가동하여, 출고 직전 야드 만재율을 ${dateInfo.yardOccupancyRate}% (${dateInfo.occupiedYardCount}/${dateInfo.availYard} 셀)로 유지하며 시스템 역할을 완수하였습니다.`
+    }
+  ].sort((a, b) => b.rate - a.rate);
 
-${formatWithDayOfWeek(selectedDate)} 당일 야드 피킹율이 ${dateInfo.yardPickingRate}%로 기록(하락)된 주된 원인은 RWCS 배치 알고리즘의 로직 오류가 아닙니다.
+  // 가장 큰 악영향 요인
+  const biggestFactor = factors[0];
 
-1. 현장 인프라 진입 차단 (Infrastructure Loss: ${dateInfo.infraLossRate}%):
-   당일 출고 요청된 SKU의 핵심 재고 중 약 ${dateInfo.infraLossRate}%가 현장 진입 차단 구역(Blocked == TRUE, 랙 전체 차단율 33.7%)에 묶여 있어 무인지게차(AGF)의 접근이 물리적으로 불가능했습니다.
+  const reportLines = [
+    `[RWCS 운영 결과 분석 리포트 - ${formatWithDayOfWeek(selectedDate)}]`,
+    ``,
+    `${formatWithDayOfWeek(selectedDate)} 당일 야드 피킹율 ${dateInfo.yardPickingRate}% 기록의 주된 원인은 RWCS 배치 알고리즘의 로직 오류가 아닙니다. 가장 큰 악영향 요인은 「${biggestFactor.label}(${biggestFactor.subLabel})」으로, 전체 피킹율 손실 중 가장 높은 비율을 차지하였습니다.`,
+    ``,
+    ...factors.map((f, i) => [
+      `${i + 1}. ${f.label} (${f.subLabel}):`,
+      `   ${f.body}`,
+      ``
+    ]).flat(),
+    `■ 종합 의견:`,
+    `   금일 피킹율 하락은 RWCS 알고리즘 자체의 오류나 성능 한계에서 비롯된 것이 아닙니다. 가장 큰 원인은 ①전날 지게차 완료 미션 부족에 따른 야드플랜 미실행(${dateInfo.yardPlanLossRate ?? 0}%)이며, 이어서 ②현장 적치 불량으로 인한 반복적인 로봇 Soft reset(${dateInfo.opErrorLossRate}%)과 ③물리적 인프라 차단으로 인한 AGF 접근 불가(${dateInfo.infraLossRate}%)가 복합적으로 작용하였습니다. RWCS 시스템은 이러한 제약 조건 속에서도 차선순위 미션 자동 전환으로 야드 만재율을 정상 유지하며 시스템의 역할을 충실히 수행하였습니다. 향후 피킹율 개선을 위해서는 전날 야드플랜 완료 미션 목표 달성, 현장 파레트 적치 기준 강화, 진입 차단 구역의 단계적 해제가 우선 과제로 판단됩니다.`
+  ];
 
-2. 현장 자재 적치 관리 부실 (Operational Error Loss: ${dateInfo.opErrorLossRate}%):
-   야간 전진 배치 작업 중, 4~5단 고단 랙 피킹 시 파레트 흔들림 및 적치 불량으로 인한 로봇 안전 센서 정상 보호 동작(Soft reset)이 총 ${dateInfo.softResetCount}건 발생하였습니다. 이는 로봇 하드웨어 및 현장 관리 부실에 기인한 손실입니다.
-
-3. RWCS 시스템 복구 및 만재율 입증 (Fallback & Occupancy Rate: ${dateInfo.yardOccupancyRate}%):
-   로봇 제어 시스템(RWCS)은 에러 속에서도 즉시 차선순위(Next Best) 미션을 자동 가동하여, 출고 직전 야드 만재율을 ${dateInfo.yardOccupancyRate}% (${dateInfo.occupiedYardCount}/${dateInfo.availYard} 셀)로 꽉 채워두며 시스템 역할을 완수하였습니다.
-
-결론: 일일 피킹율 손실은 RWCS 시스템의 알고리즘 정교함 부족이 아닌, 현장의 물리적 인프라 차단과 파레트 관리 부실에서 기인한 정량적 팩트입니다.`;
+  const reportText = reportLines.join('\n');
 
   const handleExportPDF = async () => {
     const reportElem = document.getElementById('defense-report-container');
     if (!reportElem) return;
-
     try {
       const canvas = await html2canvas(reportElem, { scale: 2, backgroundColor: '#0b0f19' });
       const imgData = canvas.toDataURL('image/png');
@@ -48,7 +78,7 @@ ${formatWithDayOfWeek(selectedDate)} 당일 야드 피킹율이 ${dateInfo.yardP
       <div className="section-header">
         <div className="section-title">
           <FileText color="var(--accent-cyan)" size={22} />
-          <span>대고객 제출용 서술형 방어 리포트 (Daily Defense Report)</span>
+          <span>분석 리포트</span>
         </div>
 
         <button className="btn-primary" onClick={handleExportPDF}>
