@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import HeaderMasterKPI from './components/HeaderMasterKPI';
 import PickingTrendView from './components/PickingTrendView';
 import RootCauseIsolationView from './components/RootCauseIsolationView';
@@ -8,7 +8,9 @@ import ExceptionAlertBanner from './components/ExceptionAlertBanner';
 import PlannerSimulatorView from './components/PlannerSimulatorView';
 import WmsDoReceiverView from './components/WmsDoReceiverView';
 import LoginScreen from './components/LoginScreen';
+import AccessLogModal from './components/AccessLogModal';
 import { loadAndProcessData, processRawDatasets, fetchSupabaseData, fetchExcelData } from './services/dataProcessor';
+import { logLogin, logLogout } from './services/accessLogger';
 import * as XLSX from 'xlsx';
 import { Upload, Sparkles } from 'lucide-react';
 import './styles/dashboard.css';
@@ -16,10 +18,13 @@ import './styles/dashboard.css';
 const DEFAULT_RACK_PATH = 'c:\\Users\\bosel\\Desktop\\한화비전 분석 프로그램\\Rack_20260720_수정.xlsx';
 const DEFAULT_INVENTORY_PATH = 'c:\\Users\\bosel\\Desktop\\한화비전 분석 프로그램\\★창고데이터(분석용).xlsx';
 
+const AUTO_LOGOUT_MS = 30 * 60 * 1000;   // 30분
+const WARN_BEFORE_MS = 5 * 60 * 1000;    // 남은 5분 전 경고
+
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem('rwcs_authenticated') === 'true');
   const [username, setUsername] = useState(() => sessionStorage.getItem('rwcs_username') || '');
-  const [activeView, setActiveView] = useState('analytics'); // 'analytics' or 'wms_do'
+  const [activeView, setActiveView] = useState('analytics');
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState('2026-06-29');
@@ -29,13 +34,53 @@ export default function App() {
   const [dragActive, setDragActive] = useState(false);
   const [simPickingRows, setSimPickingRows] = useState([]);
   const [simYardIds, setSimYardIds] = useState(new Set());
+  const [showAccessLog, setShowAccessLog] = useState(false);
+  const [showAutoLogoutWarn, setShowAutoLogoutWarn] = useState(false);
 
-  const handleLogout = () => {
+  const sessionIdRef = useRef(null);           // Supabase access_logs row id
+  const autoLogoutTimerRef = useRef(null);
+  const warnTimerRef = useRef(null);
+
+  const performLogout = useCallback(async (type = 'manual') => {
+    if (sessionIdRef.current) {
+      await logLogout(sessionIdRef.current, type);
+      sessionIdRef.current = null;
+    }
+    clearTimeout(autoLogoutTimerRef.current);
+    clearTimeout(warnTimerRef.current);
+    setShowAutoLogoutWarn(false);
     sessionStorage.removeItem('rwcs_authenticated');
     sessionStorage.removeItem('rwcs_username');
     setIsAuthenticated(false);
     setUsername('');
-  };
+  }, []);
+
+  const handleLogout = useCallback(() => performLogout('manual'), [performLogout]);
+
+  // 무활동 자동 로그아웃 타이머 리셋
+  const resetAutoLogoutTimer = useCallback(() => {
+    if (!isAuthenticated) return;
+    clearTimeout(autoLogoutTimerRef.current);
+    clearTimeout(warnTimerRef.current);
+    setShowAutoLogoutWarn(false);
+    // 25분 후 경고 토스트
+    warnTimerRef.current = setTimeout(() => setShowAutoLogoutWarn(true), AUTO_LOGOUT_MS - WARN_BEFORE_MS);
+    // 30분 후 자동 로그아웃
+    autoLogoutTimerRef.current = setTimeout(() => performLogout('auto'), AUTO_LOGOUT_MS);
+  }, [isAuthenticated, performLogout]);
+
+  // 인증된 동안 활동 이벤트 감지
+  useEffect(() => {
+    if (!isAuthenticated) return;
+    resetAutoLogoutTimer();
+    const events = ['mousemove', 'mousedown', 'keydown', 'touchstart', 'scroll'];
+    events.forEach(ev => window.addEventListener(ev, resetAutoLogoutTimer, { passive: true }));
+    return () => {
+      events.forEach(ev => window.removeEventListener(ev, resetAutoLogoutTimer));
+      clearTimeout(autoLogoutTimerRef.current);
+      clearTimeout(warnTimerRef.current);
+    };
+  }, [isAuthenticated, resetAutoLogoutTimer]);
 
   const [rackFileInfo, setRackFileInfo] = useState({
     name: 'Rack_20260720_수정.xlsx',
@@ -352,11 +397,14 @@ export default function App() {
   if (!isAuthenticated) {
     return (
       <LoginScreen 
-        onLoginSuccess={(name) => {
+        onLoginSuccess={async (name) => {
           sessionStorage.setItem('rwcs_authenticated', 'true');
           sessionStorage.setItem('rwcs_username', name);
           setIsAuthenticated(true);
           setUsername(name);
+          // Supabase access_logs에 로그인 기록 INSERT
+          const sid = await logLogin(name);
+          sessionIdRef.current = sid;
         }} 
       />
     );
@@ -434,6 +482,7 @@ export default function App() {
         onChangeView={setActiveView}
         onLogout={handleLogout}
         username={username}
+        onShowAccessLog={() => setShowAccessLog(true)}
       />
 
       {activeView === 'analytics' ? (
@@ -504,6 +553,26 @@ export default function App() {
         onClose={() => setIsSimulatorOpen(false)}
         dateInfo={currentDateInfo}
       />
+
+      {/* 8. Access Log Modal */}
+      {showAccessLog && <AccessLogModal onClose={() => setShowAccessLog(false)} />}
+
+      {/* 9. Auto Logout Warning Toast */}
+      {showAutoLogoutWarn && (
+        <div style={{
+          position: 'fixed', bottom: '24px', right: '24px', zIndex: 9998,
+          background: 'linear-gradient(135deg, rgba(245,158,11,0.95), rgba(239,68,68,0.9))',
+          border: '1px solid rgba(245,158,11,0.6)',
+          borderRadius: '12px', padding: '14px 20px',
+          color: '#fff', fontSize: '0.9rem', fontWeight: 600,
+          boxShadow: '0 8px 30px rgba(245,158,11,0.4)',
+          display: 'flex', alignItems: 'center', gap: '10px',
+          animation: 'pulse 1.5s infinite'
+        }}>
+          ⚠️ 5분 후 자동 로그아웃됩니다. 계속 사용하시려면 화면을 클릭하세요.
+          <button onClick={resetAutoLogoutTimer} style={{ background: 'rgba(255,255,255,0.25)', border: 'none', borderRadius: '6px', padding: '4px 10px', color: '#fff', cursor: 'pointer', fontWeight: 700, fontSize: '0.8rem' }}>계속 사용</button>
+        </div>
+      )}
     </div>
   );
 }

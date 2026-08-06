@@ -1,4 +1,4 @@
-import { ShieldAlert, Server, AlertTriangle, Layers, Calendar, Cpu, Database, FileSpreadsheet, FolderOpen, FileCheck, Download, LogOut } from 'lucide-react';
+import { ShieldAlert, Server, AlertTriangle, Layers, Calendar, Cpu, Database, FileSpreadsheet, FolderOpen, FileCheck, Download, LogOut, ClipboardList } from 'lucide-react';
 import { formatWithDayOfWeek } from '../services/dataProcessor';
 
 export default function HeaderMasterKPI({ 
@@ -18,7 +18,8 @@ export default function HeaderMasterKPI({
   activeView,
   onChangeView,
   onLogout,
-  username
+  username,
+  onShowAccessLog
 }) {
   if (!masterKPI) return null;
 
@@ -45,37 +46,46 @@ export default function HeaderMasterKPI({
             </p>
           </div>
         </div>
+      </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
-          <div className="date-selector-group">
-            <Calendar size={18} color="var(--accent-cyan)" />
-            <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>분석 일자 (Day N+1):</span>
-            <select value={selectedDate} onChange={(e) => onSelectDate(e.target.value)}>
-              {dates.map(d => (
-                <option key={d} value={d} style={{ background: '#111827', color: '#fff' }}>
-                  {formatWithDayOfWeek(d)} {d === '2026-06-29' ? '⚠️ (피킹율 급락일)' : ''}
-                </option>
-              ))}
-            </select>
-          </div>
+      {/* 컨트롤 줄: 좌측(날짜·버튼) | 우측(접속자·로그·로그아웃) */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '10px', flexWrap: 'wrap' }}>
 
-          <button className="btn-primary" onClick={onOpenSimulator}>
-            <Cpu size={18} />
-            슬로팅 보정 시뮬레이터
+        {/* ── 좌측 그룹 ── */}
+        <div className="date-selector-group">
+          <Calendar size={18} color="var(--accent-cyan)" />
+          <span style={{ fontSize: '0.85rem', color: 'var(--text-secondary)' }}>분석 일자 (Day N+1):</span>
+          <select value={selectedDate} onChange={(e) => onSelectDate(e.target.value)}>
+            {dates.map(d => (
+              <option key={d} value={d} style={{ background: '#111827', color: '#fff' }}>
+                {formatWithDayOfWeek(d)} {d === '2026-06-29' ? '⚠️ (피킹율 급락일)' : ''}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <button className="btn-primary" onClick={onOpenSimulator}>
+          <Cpu size={18} />
+          슬로팅 보정 시뮬레이터
+        </button>
+
+        {activeView === 'analytics' ? (
+          <button className="btn-secondary" onClick={() => onChangeView('wms_do')} style={{ border: '1px solid var(--accent-cyan)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Database size={18} color="var(--accent-cyan)" />
+            WMS 수집 제어판
           </button>
+        ) : (
+          <button className="btn-secondary" onClick={() => onChangeView('analytics')} style={{ border: '1px solid var(--accent-blue)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <Cpu size={18} color="var(--accent-blue)" />
+            운영 분석 대시보드
+          </button>
+        )}
 
-          {activeView === 'analytics' ? (
-            <button className="btn-secondary" onClick={() => onChangeView('wms_do')} style={{ border: '1px solid var(--accent-cyan)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Database size={18} color="var(--accent-cyan)" />
-              WMS 수집 제어판
-            </button>
-          ) : (
-            <button className="btn-secondary" onClick={() => onChangeView('analytics')} style={{ border: '1px solid var(--accent-blue)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-              <Cpu size={18} color="var(--accent-blue)" />
-              운영 분석 대시보드
-            </button>
-          )}
+        {/* ── 구분선 ── */}
+        <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.15)', margin: '0 4px' }} />
 
+        {/* ── 우측 그룹 (자동 우측 정렬) ── */}
+        <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '8px' }}>
           {username && (
             <div style={{
               fontSize: '0.85rem',
@@ -92,13 +102,32 @@ export default function HeaderMasterKPI({
             </div>
           )}
 
+          {onShowAccessLog && (
+            <button
+              className="btn-secondary"
+              onClick={onShowAccessLog}
+              style={{
+                background: 'rgba(167,139,250,0.1)',
+                borderColor: 'rgba(167,139,250,0.3)',
+                color: '#a78bfa',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '6px'
+              }}
+              title="접속 로그 보기"
+            >
+              <ClipboardList size={16} />
+              접속로그보기
+            </button>
+          )}
+
           {onLogout && (
-            <button 
-              className="btn-secondary" 
-              onClick={onLogout} 
-              style={{ 
-                background: 'rgba(255, 8, 68, 0.1)', 
-                borderColor: 'rgba(255, 8, 68, 0.3)', 
+            <button
+              className="btn-secondary"
+              onClick={onLogout}
+              style={{
+                background: 'rgba(255, 8, 68, 0.1)',
+                borderColor: 'rgba(255, 8, 68, 0.3)',
                 color: '#ff4b72',
                 display: 'flex',
                 alignItems: 'center',
