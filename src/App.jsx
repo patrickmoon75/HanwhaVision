@@ -18,6 +18,7 @@ const DEFAULT_INVENTORY_PATH = 'c:\\Users\\bosel\\Desktop\\한화비전 분석 �
 
 export default function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(() => sessionStorage.getItem('rwcs_authenticated') === 'true');
+  const [username, setUsername] = useState(() => sessionStorage.getItem('rwcs_username') || '');
   const [activeView, setActiveView] = useState('analytics'); // 'analytics' or 'wms_do'
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -31,7 +32,9 @@ export default function App() {
 
   const handleLogout = () => {
     sessionStorage.removeItem('rwcs_authenticated');
+    sessionStorage.removeItem('rwcs_username');
     setIsAuthenticated(false);
+    setUsername('');
   };
 
   const [rackFileInfo, setRackFileInfo] = useState({
@@ -65,7 +68,7 @@ export default function App() {
         if (result.pickingRows) setSimPickingRows(result.pickingRows);
         if (result.yardIds) setSimYardIds(result.yardIds);
         if (result.dates && result.dates.length > 0) {
-          setSelectedDate(result.dates.includes('2026-06-29') ? '2026-06-29' : result.dates[0]);
+          setSelectedDate(result.dates[result.dates.length - 1]);
           setStartDate(result.dates[0]);
           setEndDate(result.dates[result.dates.length - 1]);
         }
@@ -137,7 +140,7 @@ export default function App() {
 
       if (result.dates && result.dates.length > 0) {
         if (!result.dates.includes(selectedDate)) {
-          setSelectedDate(result.dates[0]);
+          setSelectedDate(result.dates[result.dates.length - 1]);
         }
         setStartDate(result.dates[0]);
         setEndDate(result.dates[result.dates.length - 1]);
@@ -167,7 +170,7 @@ export default function App() {
       if (result.pickingRows) setSimPickingRows(result.pickingRows);
       if (result.yardIds) setSimYardIds(result.yardIds);
       if (result.dates && result.dates.length > 0) {
-        setSelectedDate(result.dates.includes('2026-06-29') ? '2026-06-29' : result.dates[0]);
+        setSelectedDate(result.dates[result.dates.length - 1]);
         setStartDate(result.dates[0]);
         setEndDate(result.dates[result.dates.length - 1]);
       }
@@ -200,7 +203,7 @@ export default function App() {
       if (result.pickingRows) setSimPickingRows(result.pickingRows);
       if (result.yardIds) setSimYardIds(result.yardIds);
       if (result.dates && result.dates.length > 0) {
-        setSelectedDate(result.dates.includes('2026-06-29') ? '2026-06-29' : result.dates[0]);
+        setSelectedDate(result.dates[result.dates.length - 1]);
         setStartDate(result.dates[0]);
         setEndDate(result.dates[result.dates.length - 1]);
       }
@@ -335,7 +338,7 @@ export default function App() {
       setInventoryFileInfo(updatedInventoryFile);
 
       if (result.dates && result.dates.length > 0) {
-        setSelectedDate(result.dates[0]);
+        setSelectedDate(result.dates[result.dates.length - 1]);
         setStartDate(result.dates[0]);
         setEndDate(result.dates[result.dates.length - 1]);
       }
@@ -347,7 +350,16 @@ export default function App() {
   };
 
   if (!isAuthenticated) {
-    return <LoginScreen onLoginSuccess={() => setIsAuthenticated(true)} />;
+    return (
+      <LoginScreen 
+        onLoginSuccess={(name) => {
+          sessionStorage.setItem('rwcs_authenticated', 'true');
+          sessionStorage.setItem('rwcs_username', name);
+          setIsAuthenticated(true);
+          setUsername(name);
+        }} 
+      />
+    );
   }
 
   if (loading) {
@@ -421,6 +433,7 @@ export default function App() {
         activeView={activeView}
         onChangeView={setActiveView}
         onLogout={handleLogout}
+        username={username}
       />
 
       {activeView === 'analytics' ? (

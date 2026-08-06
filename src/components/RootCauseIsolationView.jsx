@@ -1,8 +1,11 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts';
 import { PieChart as PieIcon, AlertOctagon, ShieldCheck, BarChart2 } from 'lucide-react';
+import { formatWithDayOfWeek } from '../services/dataProcessor';
 
 export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
+  const [useTodayStock, setUseTodayStock] = useState(false);
+  
   if (!dateInfo) return null;
 
   const totalLoss = (100 - Number(dateInfo.yardPickingRate || 0)).toFixed(2);
@@ -91,7 +94,7 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
           </div>
           {/* 우상단: 선택 날짜 + 피킹율 */}
           <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '2px', background: 'rgba(255, 255, 255, 0.05)', padding: '6px 10px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.1)' }}>
-            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500 }}>{dateInfo.pickingDate}</span>
+            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', fontWeight: 500 }}>{formatWithDayOfWeek(dateInfo.pickingDate)}</span>
             <span style={{ fontSize: '1.6rem', fontWeight: 800, color: 'var(--accent-rose)', fontFamily: 'Outfit', lineHeight: 1 }}>{dateInfo.yardPickingRate}%</span>
             <span style={{ fontSize: '0.65rem', color: 'var(--text-muted)' }}>피킹율</span>
           </div>
@@ -363,56 +366,76 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
       {/* 3. Capacity & Fallback Proof */}
       <div className="glass-card" style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
         <div>
-          <div className="section-title" style={{ fontSize: '1rem', marginBottom: '12px' }}>
-            <ShieldCheck color="var(--accent-green)" size={20} />
-            <span>야드 만재율</span>
+          <div className="section-title" style={{ fontSize: '1rem', marginBottom: '12px', display: 'flex', justifyContent: 'space-between', alignItems: 'center', width: '100%' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <ShieldCheck color="var(--accent-green)" size={20} />
+              <span>야드 만재율</span>
+            </div>
+            <label style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.75rem', color: 'var(--text-secondary)', cursor: 'pointer', userSelect: 'none' }}>
+              <input
+                type="checkbox"
+                checked={useTodayStock}
+                onChange={(e) => setUseTodayStock(e.target.checked)}
+                style={{ cursor: 'pointer', accentColor: 'var(--accent-green)' }}
+              />
+              당일 재고 기준 계산
+            </label>
           </div>
 
-          <div style={{ display: 'flex', gap: '12px', width: '100%', marginBottom: '12px' }}>
-            {/* 좌측: 전일 */}
-            <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px', fontWeight: 600 }}>
-                전일 ({dateInfo.prevDate || '데이터 없음'})
-              </div>
-              <div>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>야드플랜 완료 미션</span>
-                <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {dateInfo.prevCompletedCount ?? 0} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-muted)' }}>건</span>
-                </span>
-              </div>
-              <div>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>최종 야드 만재율</span>
-                <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-green)', fontFamily: 'Outfit' }}>
-                  {(dateInfo.prevYardOccupancyRate === null || dateInfo.prevYardOccupancyRate === undefined) ? '데이터 없음' : `${dateInfo.prevYardOccupancyRate}%`}
-                </span>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
-                  {(dateInfo.prevYardOccupancyRate === null || dateInfo.prevYardOccupancyRate === undefined) ? '-' : `805개 중 ${dateInfo.prevOccupiedYardCount}개 셀`}
-                </span>
-              </div>
-            </div>
+          {(() => {
+            const displayPrevYardOccupancyRate = useTodayStock ? dateInfo.prevYardOccupancyRateToday : dateInfo.prevYardOccupancyRate;
+            const displayPrevOccupiedYardCount = useTodayStock ? dateInfo.prevOccupiedYardCountToday : dateInfo.prevOccupiedYardCount;
+            const displayYardOccupancyRate = useTodayStock ? dateInfo.yardOccupancyRateToday : dateInfo.yardOccupancyRate;
+            const displayOccupiedYardCount = useTodayStock ? dateInfo.occupiedYardCountToday : dateInfo.occupiedYardCount;
 
-            {/* 우측: 당일 */}
-            <div style={{ flex: 1, background: 'rgba(0, 230, 118, 0.02)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(0, 230, 118, 0.1)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={{ fontSize: '0.78rem', color: 'var(--accent-green)', borderBottom: '1px solid rgba(0, 230, 118, 0.15)', paddingBottom: '4px', fontWeight: 600 }}>
-                당일 ({dateInfo.pickingDate || '데이터 없음'})
+            return (
+              <div style={{ display: 'flex', gap: '12px', width: '100%', marginBottom: '12px' }}>
+                {/* 좌측: 전일 */}
+                <div style={{ flex: 1, background: 'rgba(255,255,255,0.03)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(255,255,255,0.05)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--text-secondary)', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '4px', fontWeight: 600 }}>
+                    전일 ({formatWithDayOfWeek(dateInfo.prevDate) || '데이터 없음'})
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>야드플랜 완료 미션</span>
+                    <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      {dateInfo.prevCompletedCount ?? 0} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-muted)' }}>건</span>
+                    </span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>최종 야드 만재율</span>
+                    <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-green)', fontFamily: 'Outfit' }}>
+                      {(displayPrevYardOccupancyRate === null || displayPrevYardOccupancyRate === undefined) ? '데이터 없음' : `${displayPrevYardOccupancyRate}%`}
+                    </span>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
+                      {(displayPrevYardOccupancyRate === null || displayPrevYardOccupancyRate === undefined) ? '-' : `805개 중 ${displayPrevOccupiedYardCount}개 셀`}
+                    </span>
+                  </div>
+                </div>
+
+                {/* 우측: 당일 */}
+                <div style={{ flex: 1, background: 'rgba(0, 230, 118, 0.02)', padding: '12px', borderRadius: '10px', border: '1px solid rgba(0, 230, 118, 0.1)', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div style={{ fontSize: '0.78rem', color: 'var(--accent-green)', borderBottom: '1px solid rgba(0, 230, 118, 0.15)', paddingBottom: '4px', fontWeight: 600 }}>
+                    당일 ({formatWithDayOfWeek(dateInfo.pickingDate) || '데이터 없음'})
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>야드플랜 완료 미션</span>
+                    <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
+                      {dateInfo.completedCount ?? 0} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-muted)' }}>건</span>
+                    </span>
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>최종 야드 만재율</span>
+                    <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-green)', fontFamily: 'Outfit' }}>
+                      {(displayYardOccupancyRate === null || displayYardOccupancyRate === undefined) ? '데이터 없음' : `${displayYardOccupancyRate}%`}
+                    </span>
+                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
+                      {(displayYardOccupancyRate === null || displayYardOccupancyRate === undefined) ? '-' : `805개 중 ${displayOccupiedYardCount}개 셀`}
+                    </span>
+                  </div>
+                </div>
               </div>
-              <div>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>야드플랜 완료 미션</span>
-                <span style={{ fontSize: '1.2rem', fontWeight: 700, color: 'var(--text-primary)' }}>
-                  {dateInfo.completedCount ?? 0} <span style={{ fontSize: '0.8rem', fontWeight: 'normal', color: 'var(--text-muted)' }}>건</span>
-                </span>
-              </div>
-              <div>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block' }}>최종 야드 만재율</span>
-                <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-green)', fontFamily: 'Outfit' }}>
-                  {(dateInfo.yardOccupancyRate === null || dateInfo.yardOccupancyRate === undefined) ? '데이터 없음' : `${dateInfo.yardOccupancyRate}%`}
-                </span>
-                <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
-                  {(dateInfo.yardOccupancyRate === null || dateInfo.yardOccupancyRate === undefined) ? '-' : `805개 중 ${dateInfo.occupiedYardCount}개 셀`}
-                </span>
-              </div>
-            </div>
-          </div>
+            );
+          })()}
         </div>
 
 

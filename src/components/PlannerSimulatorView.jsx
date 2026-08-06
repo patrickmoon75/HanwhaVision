@@ -7,6 +7,7 @@ import { FlaskConical, Play, RotateCcw, ChevronDown, ChevronUp, TrendingUp, Info
 import * as XLSX from 'xlsx';
 import { runPlannerSimulation } from '../services/plannerSimulator';
 import { supabase, isSupabaseConfigured } from '../services/supabaseClient';
+import { formatWithDayOfWeek } from '../services/dataProcessor';
 
 // ── 기본 Config (RWCS 고도화 설정값) ─────────────────────────────────
 const DEFAULT_CONFIG = {
@@ -66,7 +67,7 @@ function SimTooltip({ active, payload }) {
       color: '#fff',
       minWidth: '240px',
     }}>
-      <p style={{ fontWeight: 700, color: '#a78bfa', marginBottom: '6px' }}>{data.date}</p>
+      <p style={{ fontWeight: 700, color: '#a78bfa', marginBottom: '6px' }}>{formatWithDayOfWeek(data.fullDate)}</p>
       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', fontSize: '0.82rem' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', gap: '16px' }}>
           <span style={{ color: '#94a3b8' }}>실제 피킹율:</span>
@@ -831,7 +832,7 @@ export default function PlannerSimulatorView({
             >
               {dates.map(d => (
                 <option key={`sim-start-${d}`} value={d} disabled={endDate && d > endDate} style={{ background: '#111827', color: '#fff' }}>
-                  {d}
+                  {formatWithDayOfWeek(d)}
                 </option>
               ))}
             </select>
@@ -852,7 +853,7 @@ export default function PlannerSimulatorView({
             >
               {dates.map(d => (
                 <option key={`sim-end-${d}`} value={d} disabled={startDate && d < startDate} style={{ background: '#111827', color: '#fff' }}>
-                  {d}
+                  {formatWithDayOfWeek(d)}
                 </option>
               ))}
             </select>
@@ -1022,7 +1023,7 @@ export default function PlannerSimulatorView({
                               </div>
                             </td>
                             <td style={{ padding: '10px 8px', fontFamily: 'monospace', color: 'var(--text-secondary)' }}>
-                              {item.start_date.slice(5)} ~ {item.end_date.slice(5)}
+                              {formatWithDayOfWeek(item.start_date)} ~ {formatWithDayOfWeek(item.end_date)}
                             </td>
                             <td style={{ padding: '10px 8px', textAlign: 'center', color: '#00f2fe', fontWeight: 600 }}>{summary.avgActual}%</td>
                             <td style={{ padding: '10px 8px', textAlign: 'center', color: '#a78bfa', fontWeight: 600 }}>{summary.avgSim}%</td>
@@ -1175,7 +1176,7 @@ export default function PlannerSimulatorView({
               }}>
                 <div>
                   <span style={{ fontSize: '0.8rem', color: 'var(--text-secondary)' }}>선택된 날짜:</span>
-                  <strong style={{ fontSize: '1.05rem', color: '#a78bfa', marginLeft: '6px' }}>{selectedDate}</strong>
+                  <strong style={{ fontSize: '1.05rem', color: '#a78bfa', marginLeft: '6px' }}>{formatWithDayOfWeek(selectedDate)}</strong>
                 </div>
                 <div style={{ display: 'flex', gap: '24px', flexWrap: 'wrap', fontSize: '0.85rem' }}>
                   <div>실제 피킹율: <strong style={{ color: '#00f2fe' }}>{selectedResult.actualRate !== null ? `${selectedResult.actualRate}%` : '—'}</strong></div>
@@ -1578,7 +1579,7 @@ export default function PlannerSimulatorView({
                           }}
                           onClick={() => onSelectDate && onSelectDate(r.date)}
                         >
-                          <td style={{ padding: '6px 10px', textAlign: 'center', color: isSel ? '#a78bfa' : '#f1f5f9', fontWeight: 600 }}>{r.date}</td>
+                          <td style={{ padding: '6px 10px', textAlign: 'center', color: isSel ? '#a78bfa' : '#f1f5f9', fontWeight: 600 }}>{formatWithDayOfWeek(r.date)}</td>
                           <td style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)' }}>{r.pickOrderCount}건</td>
                           <td style={{ padding: '6px 10px', textAlign: 'center', color: 'var(--text-secondary)' }}>{r.totalQty.toLocaleString()}</td>
                           

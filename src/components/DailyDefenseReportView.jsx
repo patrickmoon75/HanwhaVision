@@ -2,14 +2,15 @@ import React from 'react';
 import { FileText, Download, ShieldCheck, Printer } from 'lucide-react';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
+import { formatWithDayOfWeek } from '../services/dataProcessor';
 
 export default function DailyDefenseReportView({ selectedDate, dateInfo }) {
   if (!dateInfo) return null;
 
   // 서술형 방어 리포트 자동 생성 텍스트 (기획서 4.3항 요구사항 준수)
-  const reportText = `[RWCS 운영 결과 분석 및 대고객 방어 리포트 - ${selectedDate}]
+  const reportText = `[RWCS 운영 결과 분석 및 대고객 방어 리포트 - ${formatWithDayOfWeek(selectedDate)}]
 
-${selectedDate} 당일 야드 피킹율이 ${dateInfo.yardPickingRate}%로 기록(하락)된 주된 원인은 RWCS 배치 알고리즘의 로직 오류가 아닙니다.
+${formatWithDayOfWeek(selectedDate)} 당일 야드 피킹율이 ${dateInfo.yardPickingRate}%로 기록(하락)된 주된 원인은 RWCS 배치 알고리즘의 로직 오류가 아닙니다.
 
 1. 현장 인프라 진입 차단 (Infrastructure Loss: ${dateInfo.infraLossRate}%):
    당일 출고 요청된 SKU의 핵심 재고 중 약 ${dateInfo.infraLossRate}%가 현장 진입 차단 구역(Blocked == TRUE, 랙 전체 차단율 33.7%)에 묶여 있어 무인지게차(AGF)의 접근이 물리적으로 불가능했습니다.

@@ -1,4 +1,5 @@
 import { ShieldAlert, Server, AlertTriangle, Layers, Calendar, Cpu, Database, FileSpreadsheet, FolderOpen, FileCheck, Download, LogOut } from 'lucide-react';
+import { formatWithDayOfWeek } from '../services/dataProcessor';
 
 export default function HeaderMasterKPI({ 
   masterKPI, 
@@ -16,7 +17,8 @@ export default function HeaderMasterKPI({
   onConnectExcel,
   activeView,
   onChangeView,
-  onLogout
+  onLogout,
+  username
 }) {
   if (!masterKPI) return null;
 
@@ -51,7 +53,7 @@ export default function HeaderMasterKPI({
             <select value={selectedDate} onChange={(e) => onSelectDate(e.target.value)}>
               {dates.map(d => (
                 <option key={d} value={d} style={{ background: '#111827', color: '#fff' }}>
-                  {d} {d === '2026-06-29' ? '⚠️ (피킹율 급락일)' : ''}
+                  {formatWithDayOfWeek(d)} {d === '2026-06-29' ? '⚠️ (피킹율 급락일)' : ''}
                 </option>
               ))}
             </select>
@@ -72,6 +74,22 @@ export default function HeaderMasterKPI({
               <Cpu size={18} color="var(--accent-blue)" />
               운영 분석 대시보드
             </button>
+          )}
+
+          {username && (
+            <div style={{
+              fontSize: '0.85rem',
+              color: 'var(--text-secondary)',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+              background: 'rgba(255, 255, 255, 0.05)',
+              padding: '6px 12px',
+              borderRadius: '8px',
+              border: '1px solid rgba(255, 255, 255, 0.1)'
+            }}>
+              접속자: <strong style={{ color: 'var(--accent-cyan)' }}>{username}</strong> 님
+            </div>
           )}
 
           {onLogout && (

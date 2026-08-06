@@ -326,7 +326,23 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
     }
   });
 
-  const sortedDates = Array.from(datesSet).sort();
+  const sortedDatesExist = Array.from(datesSet).sort();
+  const sortedDates = [];
+  if (sortedDatesExist.length > 0) {
+    const startDateStr = sortedDatesExist[0];
+    const endDateStr = sortedDatesExist[sortedDatesExist.length - 1];
+    
+    let current = new Date(startDateStr);
+    const end = new Date(endDateStr);
+    
+    while (current <= end) {
+      const yyyy = current.getFullYear();
+      const mm = String(current.getMonth() + 1).padStart(2, '0');
+      const dd = String(current.getDate()).padStart(2, '0');
+      sortedDates.push(`${yyyy}-${mm}-${dd}`);
+      current.setDate(current.getDate() + 1);
+    }
+  }
 
   // Helper date parsing (Day N <-> Day N+1)
   const getPrevDate = (dateStr) => {
@@ -336,10 +352,13 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
   };
 
   const formatDateToShort = (dateStr) => {
-    // Convert 2026-06-01 to 6/1 or 20260601
     const parts = dateStr.split('-');
     if (parts.length === 3) {
-      return `${parseInt(parts[1])}/${parseInt(parts[2])}`;
+      const d = new Date(dateStr);
+      const day = d.getDay();
+      const week = ['일', '월', '화', '수', '목', '금', '토'];
+      const daySuffix = isNaN(day) ? '' : `(${week[day]})`;
+      return `${parseInt(parts[1])}/${parseInt(parts[2])} ${daySuffix}`.trim();
     }
     return dateStr;
   };
@@ -430,6 +449,12 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
       return d.includes(prevDate) || d.includes(shortPrevDate) || d.replace(/\//g, '').includes(compactPrevDate.slice(4));
     });
 
+    let dayInvToday = inventoryRows.filter(i => {
+      const d = getInvDate(i);
+      if (!d) return false;
+      return d.includes(pickingDate) || d.includes(formatDateToShort(pickingDate)) || d.replace(/\//g, '').includes(compactPickingDate.slice(4));
+    });
+
     // Soft resets & Mission State Breakdown
     const softResetMissions = dayMissions.filter(m => m.Message && String(m.Message).includes('Soft reset'));
     const abortedCount = dayMissions.filter(m => m.State && String(m.State).trim().toLowerCase() === 'aborted').length;
@@ -458,7 +483,7 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
     });
 
     // Yard Occupancy Rate (Items in Yard Racks / Available Yard Slots)
-    // 1. 중복되지 않은 야드 셀 (Unique Yard LocationId Set) 추출
+    // 1. 중복되지 않은 야드 셀 (Unique Yard LocationId Set) 추출 (전일 재고 기준)
     const occupiedYardSet = new Set();
     
     dayInv.forEach(i => {
@@ -486,6 +511,35 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
     } else {
       occupiedYardCount = 0;
       yardOccupancyRate = null;
+    }
+
+    // 2. 중복되지 않은 야드 셀 추출 (당일 재고 기준)
+    const occupiedYardSetToday = new Set();
+    
+    dayInvToday.forEach(i => {
+      const loc = getInvLocation(i);
+      const qty = getInvQty(i);
+      if (loc && yardIds.has(loc) && qty > 0) {
+        occupiedYardSetToday.add(loc);
+      }
+    });
+
+    let realOccupiedCountToday = occupiedYardSetToday.size;
+
+    if (availYard > 0) {
+      realOccupiedCountToday = Math.min(availYard, realOccupiedCountToday);
+    }
+
+    let occupiedYardCountToday = realOccupiedCountToday;
+    let yardOccupancyRateToday = null;
+
+    if (dayInvToday.length > 0) {
+      if (availYard > 0) {
+        yardOccupancyRateToday = Number(Math.min(100.0, (occupiedYardCountToday / availYard) * 100).toFixed(1));
+      }
+    } else {
+      occupiedYardCountToday = 0;
+      yardOccupancyRateToday = null;
     }
 
     // 4-Way Root Cause Isolation Calculation
@@ -539,6 +593,8 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
     // 전전일(D-2): prevDateInfo의 dayMissions = 그보다 하루 더 전날 밤 미션
     const prevYardOccupancyRate = prevDateInfo.yardOccupancyRate ?? null;
     const prevOccupiedYardCount = prevDateInfo.occupiedYardCount ?? 0;
+    const prevYardOccupancyRateToday = prevDateInfo.yardOccupancyRateToday ?? null;
+    const prevOccupiedYardCountToday = prevDateInfo.occupiedYardCountToday ?? 0;
     const prevTotalMissionCount = prevDateInfo.dayMissions ? prevDateInfo.dayMissions.length : null;
     const prevMissionAborted   = prevDateInfo.abortedCount   ?? 0;
     const prevMissionCanceled  = prevDateInfo.canceledCount  ?? 0;
@@ -567,6 +623,8 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
       prevCompletedCount: prevCompletedMissions,
       prevYardOccupancyRate,
       prevOccupiedYardCount,
+      prevYardOccupancyRateToday,
+      prevOccupiedYardCountToday,
       totalMissionCount,
       prevTotalMissionCount,
       prevMissionAborted,
@@ -586,6 +644,8 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
       prevLevelCounts,
       yardOccupancyRate,
       occupiedYardCount,
+      yardOccupancyRateToday,
+      occupiedYardCountToday,
       availYard,
       dayPlans,
       dayMissions,
@@ -613,5 +673,17 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
     yardIds,        // Set<string> — 시뮬레이터용
     pickingRows,    // 원본 피킹오더 배열 — 시뮬레이터용
   };
+}
+
+export function formatWithDayOfWeek(dateStr) {
+  if (!dateStr || typeof dateStr !== 'string') return dateStr;
+  if (dateStr.includes('(')) return dateStr;
+  
+  const cleanDate = dateStr.split(' ')[0];
+  const d = new Date(cleanDate);
+  const day = d.getDay();
+  if (isNaN(day)) return dateStr;
+  const week = ['일', '월', '화', '수', '목', '금', '토'];
+  return `${dateStr} (${week[day]})`;
 }
 

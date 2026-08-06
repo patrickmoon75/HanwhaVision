@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, LabelList, ReferenceLine } from 'recharts';
 import { TrendingDown, MousePointerClick, Info, Calendar, Database, CheckCircle2, XCircle, FileSpreadsheet } from 'lucide-react';
-import { extractDataAvailabilitySets } from '../services/dataProcessor';
+import { extractDataAvailabilitySets, formatWithDayOfWeek } from '../services/dataProcessor';
 
 export default function PickingTrendView({ 
   dates = [], 
@@ -309,7 +309,7 @@ export default function PickingTrendView({
             >
               {dates.map(d => (
                 <option key={`start-${d}`} value={d} disabled={endDate && d > endDate} style={{ background: '#111827', color: '#fff' }}>
-                  {d}
+                  {formatWithDayOfWeek(d)}
                 </option>
               ))}
             </select>
@@ -330,7 +330,7 @@ export default function PickingTrendView({
             >
               {dates.map(d => (
                 <option key={`end-${d}`} value={d} disabled={startDate && d < startDate} style={{ background: '#111827', color: '#fff' }}>
-                  {d}
+                  {formatWithDayOfWeek(d)}
                 </option>
               ))}
             </select>
@@ -399,6 +399,7 @@ export default function PickingTrendView({
                 </th>
                 {filteredDates.map(d => {
                   const isSel = d === selectedDate;
+                  const isSunday = new Date(d).getDay() === 0;
                   return (
                     <th 
                       key={`head-${d}`} 
@@ -407,14 +408,14 @@ export default function PickingTrendView({
                         padding: '6px 8px',
                         borderBottom: '1px solid rgba(255,255,255,0.08)',
                         cursor: 'pointer',
-                        color: isSel ? '#00f2fe' : 'var(--text-secondary)',
-                        fontWeight: isSel ? 700 : 500,
+                        color: isSunday ? '#ffd600' : (isSel ? '#00f2fe' : 'var(--text-secondary)'),
+                        fontWeight: isSel || isSunday ? 700 : 500,
                         background: isSel ? 'rgba(0, 242, 254, 0.12)' : 'transparent',
                         transition: 'all 0.2s'
                       }}
                       title="클릭 시 이 날짜로 상세 분석 선택"
                     >
-                      {d.slice(5)}
+                      {isSunday ? `${d.slice(5)} (일)` : d.slice(5)}
                     </th>
                   );
                 })}

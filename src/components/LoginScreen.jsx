@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, Eye, EyeOff, ShieldCheck, AlertCircle } from 'lucide-react';
+import { User, Lock, Eye, EyeOff, ShieldCheck, AlertCircle } from 'lucide-react';
 
 // 지정된 5개 비밀번호 목록 (내부 검증용)
 export const ALLOWED_PASSWORDS = [
@@ -11,12 +11,17 @@ export const ALLOWED_PASSWORDS = [
 ];
 
 export default function LoginScreen({ onLoginSuccess }) {
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
   const handleSubmit = (e) => {
     e.preventDefault();
+    if (!username.trim()) {
+      setErrorMsg('접속자 이름을 입력해 주세요.');
+      return;
+    }
     if (!password.trim()) {
       setErrorMsg('비밀번호를 입력해 주세요.');
       return;
@@ -25,7 +30,7 @@ export default function LoginScreen({ onLoginSuccess }) {
     if (ALLOWED_PASSWORDS.includes(password.trim())) {
       sessionStorage.setItem('rwcs_authenticated', 'true');
       setErrorMsg('');
-      onLoginSuccess();
+      onLoginSuccess(username.trim());
     } else {
       setErrorMsg('비밀번호가 올바르지 않습니다. 정확한 비밀번호를 입력해 주세요.');
     }
@@ -86,6 +91,33 @@ export default function LoginScreen({ onLoginSuccess }) {
 
         {/* Login Form */}
         <form onSubmit={handleSubmit} style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
+          {/* Name Input */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              <User size={15} color="var(--accent-cyan)" />
+              접속자 이름 입력
+            </label>
+            <input
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="이름을 입력하세요 (예: 홍길동)"
+              autoFocus
+              style={{
+                width: '100%',
+                padding: '12px 14px',
+                borderRadius: '10px',
+                background: 'rgba(255, 255, 255, 0.05)',
+                border: errorMsg && !username.trim() ? '1px solid #ff4b72' : '1px solid rgba(255, 255, 255, 0.15)',
+                color: '#ffffff',
+                fontSize: '0.95rem',
+                outline: 'none',
+                transition: 'all 0.2s',
+                imeMode: 'active'
+              }}
+            />
+          </div>
+
           <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
             <label style={{ fontSize: '0.85rem', fontWeight: '600', color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <Lock size={15} color="var(--accent-cyan)" />
@@ -98,17 +130,17 @@ export default function LoginScreen({ onLoginSuccess }) {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="발급받으신 비밀번호를 입력하세요"
-                autoFocus
                 style={{
                   width: '100%',
                   padding: '12px 42px 12px 14px',
                   borderRadius: '10px',
                   background: 'rgba(255, 255, 255, 0.05)',
-                  border: errorMsg ? '1px solid #ff4b72' : '1px solid rgba(255, 255, 255, 0.15)',
+                  border: errorMsg && !password.trim() && username.trim() ? '1px solid #ff4b72' : (errorMsg && ALLOWED_PASSWORDS.includes(password.trim()) === false ? '1px solid #ff4b72' : '1px solid rgba(255, 255, 255, 0.15)'),
                   color: '#ffffff',
                   fontSize: '0.95rem',
                   outline: 'none',
-                  transition: 'all 0.2s'
+                  transition: 'all 0.2s',
+                  imeMode: 'disabled'
                 }}
               />
               <button
