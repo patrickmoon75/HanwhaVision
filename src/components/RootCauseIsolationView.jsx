@@ -406,8 +406,8 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
                     <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-green)', fontFamily: 'Outfit' }}>
                       {(displayPrevYardOccupancyRate === null || displayPrevYardOccupancyRate === undefined) ? '데이터 없음' : `${displayPrevYardOccupancyRate}%`}
                     </span>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
-                      {(displayPrevYardOccupancyRate === null || displayPrevYardOccupancyRate === undefined) ? '-' : `805개 중 ${displayPrevOccupiedYardCount}개 셀`}
+                    <span style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginTop: '4px', fontWeight: 500 }}>
+                      {(displayPrevYardOccupancyRate === null || displayPrevYardOccupancyRate === undefined) ? '-' : `805개 중 ${displayPrevOccupiedYardCount}개 셀 (빈 셀: ${805 - displayPrevOccupiedYardCount}개)`}
                     </span>
                   </div>
                 </div>
@@ -428,8 +428,8 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
                     <span style={{ fontSize: '1.4rem', fontWeight: 800, color: 'var(--accent-green)', fontFamily: 'Outfit' }}>
                       {(displayYardOccupancyRate === null || displayYardOccupancyRate === undefined) ? '데이터 없음' : `${displayYardOccupancyRate}%`}
                     </span>
-                    <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', display: 'block', marginTop: '2px' }}>
-                      {(displayYardOccupancyRate === null || displayYardOccupancyRate === undefined) ? '-' : `805개 중 ${displayOccupiedYardCount}개 셀`}
+                    <span style={{ fontSize: '0.75rem', color: '#cbd5e1', display: 'block', marginTop: '4px', fontWeight: 500 }}>
+                      {(displayYardOccupancyRate === null || displayYardOccupancyRate === undefined) ? '-' : `805개 중 ${displayOccupiedYardCount}개 셀 (빈 셀: ${805 - displayOccupiedYardCount}개)`}
                     </span>
                   </div>
                 </div>

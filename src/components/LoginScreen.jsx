@@ -11,15 +11,33 @@ export const ALLOWED_PASSWORDS = [
 ];
 
 export default function LoginScreen({ onLoginSuccess }) {
-  const [username, setUsername] = useState('');
+  const [username, setUsername] = useState(() => localStorage.getItem('rwcs_saved_username') || '');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
 
+  const handleUsernameChange = (e) => {
+    const val = e.target.value;
+    if (/[a-zA-Z0-9]/.test(val)) {
+      alert('한글 이름만 입력할 수 있습니다');
+      const filtered = val.replace(/[a-zA-Z0-9]/g, '');
+      setUsername(filtered);
+      return;
+    }
+    setUsername(val);
+  };
+
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!username.trim()) {
+    const trimmedName = username.trim();
+    if (!trimmedName) {
       setErrorMsg('접속자 이름을 입력해 주세요.');
+      return;
+    }
+    // 한글 2~4자 검증
+    const koreanNameRegex = /^[가-힣]{2,4}$/;
+    if (!koreanNameRegex.test(trimmedName)) {
+      setErrorMsg('접속자 이름은 2자에서 4자 사이의 한글로만 입력해 주세요.');
       return;
     }
     if (!password.trim()) {
@@ -29,8 +47,9 @@ export default function LoginScreen({ onLoginSuccess }) {
 
     if (ALLOWED_PASSWORDS.includes(password.trim())) {
       sessionStorage.setItem('rwcs_authenticated', 'true');
+      localStorage.setItem('rwcs_saved_username', trimmedName);
       setErrorMsg('');
-      onLoginSuccess(username.trim());
+      onLoginSuccess(trimmedName);
     } else {
       setErrorMsg('비밀번호가 올바르지 않습니다. 정확한 비밀번호를 입력해 주세요.');
     }
@@ -100,7 +119,7 @@ export default function LoginScreen({ onLoginSuccess }) {
             <input
               type="text"
               value={username}
-              onChange={(e) => setUsername(e.target.value)}
+              onChange={handleUsernameChange}
               placeholder="이름을 입력하세요 (예: 홍길동)"
               autoFocus
               style={{
