@@ -1,14 +1,21 @@
 import React, { useState } from 'react';
 import { User, Lock, Eye, EyeOff, ShieldCheck, AlertCircle } from 'lucide-react';
 
-// 지정된 5개 비밀번호 목록 (내부 검증용)
-export const ALLOWED_PASSWORDS = [
-  'hanwha2026!',
-  'vision1234#',
-  'rwcs8888$',
-  'ags7777%',
-  'admin5555*'
-];
+// 지정된 5개 비밀번호 목록 및 번호 매핑
+export const PASSWORD_MAP = {
+  'hanwha2026!': 1,
+  'vision1234#': 2,
+  'rwcs8888$': 3,
+  'ags7777%': 4,
+  'admin5555*': 5
+};
+
+export const ALLOWED_PASSWORDS = Object.keys(PASSWORD_MAP);
+
+export function getPasswordNo(pw) {
+  if (!pw) return 1;
+  return PASSWORD_MAP[pw.trim()] || 1;
+}
 
 export default function LoginScreen({ onLoginSuccess }) {
   const [username, setUsername] = useState(() => localStorage.getItem('rwcs_saved_username') || '');
@@ -45,11 +52,14 @@ export default function LoginScreen({ onLoginSuccess }) {
       return;
     }
 
-    if (ALLOWED_PASSWORDS.includes(password.trim())) {
+    const trimmedPw = password.trim();
+    if (PASSWORD_MAP[trimmedPw]) {
+      const pwNo = PASSWORD_MAP[trimmedPw];
       sessionStorage.setItem('rwcs_authenticated', 'true');
+      sessionStorage.setItem('rwcs_pw_no', String(pwNo));
       localStorage.setItem('rwcs_saved_username', trimmedName);
       setErrorMsg('');
-      onLoginSuccess(trimmedName);
+      onLoginSuccess(trimmedName, pwNo);
     } else {
       setErrorMsg('비밀번호가 올바르지 않습니다. 정확한 비밀번호를 입력해 주세요.');
     }

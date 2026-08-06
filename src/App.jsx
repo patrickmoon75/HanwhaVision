@@ -408,13 +408,14 @@ export default function App() {
   if (!isAuthenticated) {
     return (
       <LoginScreen 
-        onLoginSuccess={async (name) => {
+        onLoginSuccess={async (name, pwNo) => {
           sessionStorage.setItem('rwcs_authenticated', 'true');
           sessionStorage.setItem('rwcs_username', name);
+          sessionStorage.setItem('rwcs_pw_no', String(pwNo || 1));
           setIsAuthenticated(true);
           setUsername(name);
-          // Supabase access_logs에 로그인 기록 INSERT
-          const sid = await logLogin(name);
+          // Supabase access_logs에 로그인 기록 INSERT (비밀번호 번호 포함)
+          const sid = await logLogin(name, pwNo || 1);
           sessionIdRef.current = sid;
         }} 
       />
