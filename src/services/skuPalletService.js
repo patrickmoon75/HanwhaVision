@@ -168,5 +168,18 @@ export function downloadSkuPalletExcel(skuAvgList = []) {
   XLSX.utils.book_append_sheet(workbook, worksheet, 'SKU별_파레트_평균적재량');
 
   const todayStr = new Date().toISOString().slice(0, 10).replace(/-/g, '');
-  XLSX.writeFile(workbook, `SKU별_파레트_평균적재량_${todayStr}.xlsx`);
+  const filename = `SKU별_파레트_평균적재량_${todayStr}.xlsx`;
+
+  // 브라우저 표준 엑셀 다운로드 버퍼 생성 및 안전 다운로드 처리
+  const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+  const blob = new Blob([wbout], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
 }
