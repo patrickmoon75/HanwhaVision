@@ -11,6 +11,7 @@ import LoginScreen from './components/LoginScreen';
 import AccessLogModal from './components/AccessLogModal';
 import { loadAndProcessData, processRawDatasets, fetchSupabaseData, fetchExcelData } from './services/dataProcessor';
 import { logLogin, logLogout } from './services/accessLogger';
+import { calculateSkuPalletAverages, saveSkuPalletAverages, loadSavedSkuPalletAverages, downloadSkuPalletExcel } from './services/skuPalletService';
 import * as XLSX from 'xlsx';
 import { Upload, Sparkles } from 'lucide-react';
 import './styles/dashboard.css';
@@ -36,6 +37,48 @@ export default function App() {
   const [simYardIds, setSimYardIds] = useState(new Set());
   const [showAccessLog, setShowAccessLog] = useState(false);
   const [showAutoLogoutWarn, setShowAutoLogoutWarn] = useState(false);
+
+  const [skuAvgList, setSkuAvgList] = useState([]);
+  const [isUpdatingSku, setIsUpdatingSku] = useState(false);
+  const [rawDatasets, setRawDatasets] = useState({});
+
+  // 저장된 SKU 파레트 평균 적재량 데이터 로드
+  useEffect(() => {
+    loadSavedSkuPalletAverages().then(res => {
+      if (res && res.list) {
+        setSkuAvgList(res.list);
+      }
+    });
+  }, []);
+
+  // 'SKU업데이트' 핸들러
+  const handleUpdateSkuPalletAvg = async () => {
+    if (!rawDatasets || !rawDatasets.inventoryRows || rawDatasets.inventoryRows.length === 0) {
+      alert("재고현황 데이터가 로드되지 않았습니다. 메인 대시보드 데이터를 불러온 후 시도해주세요.");
+      return;
+    }
+
+    setIsUpdatingSku(true);
+    try {
+      const inventoryRows = rawDatasets.inventoryRows || [];
+      const { list, map } = calculateSkuPalletAverages(inventoryRows);
+      
+      await saveSkuPalletAverages(list);
+      setSkuAvgList(list);
+
+      alert(`✅ 6월 1일부터 현재까지의 재고 데이터 기준 SKU 파레트 평균 적재량이 성공적으로 업데이트 및 저장되었습니다.\n(총 ${list.length}개 SKU 연산 완료)`);
+    } catch (err) {
+      console.error("SKU update failed:", err);
+      alert("SKU 파레트 평균 적재량 업데이트 중 오류가 발생하였습니다.");
+    } finally {
+      setIsUpdatingSku(false);
+    }
+  };
+
+  // 'SKU다운로드' 핸들러
+  const handleDownloadSkuPalletExcel = () => {
+    downloadSkuPalletExcel(skuAvgList);
+  };
 
   const sessionIdRef = useRef(null);           // Supabase access_logs row id
   const autoLogoutTimerRef = useRef(null);
@@ -495,6 +538,9 @@ export default function App() {
         onLogout={handleLogout}
         username={username}
         onShowAccessLog={() => setShowAccessLog(true)}
+        onUpdateSkuPalletAvg={handleUpdateSkuPalletAvg}
+        onDownloadSkuPalletExcel={handleDownloadSkuPalletExcel}
+        isUpdatingSku={isUpdatingSku}
       />
 
       {activeView === 'analytics' ? (

@@ -1,4 +1,4 @@
-import { ShieldAlert, Server, AlertTriangle, Layers, Calendar, Cpu, Database, FileSpreadsheet, FolderOpen, FileCheck, Download, LogOut, ClipboardList } from 'lucide-react';
+import { ShieldAlert, Server, AlertTriangle, Layers, Calendar, Cpu, Database, FileSpreadsheet, FolderOpen, FileCheck, Download, LogOut, ClipboardList, RefreshCw } from 'lucide-react';
 import { formatWithDayOfWeek } from '../services/dataProcessor';
 
 export default function HeaderMasterKPI({ 
@@ -19,7 +19,10 @@ export default function HeaderMasterKPI({
   onChangeView,
   onLogout,
   username,
-  onShowAccessLog
+  onShowAccessLog,
+  onUpdateSkuPalletAvg,
+  onDownloadSkuPalletExcel,
+  isUpdatingSku
 }) {
   if (!masterKPI) return null;
 
@@ -80,6 +83,28 @@ export default function HeaderMasterKPI({
             운영 분석 대시보드
           </button>
         )}
+
+        {/* ── SKU별 파레트 평균 적재량 관리 버튼 그룹 (신설) ── */}
+        <button 
+          className="btn-secondary" 
+          onClick={onUpdateSkuPalletAvg}
+          disabled={isUpdatingSku}
+          title="6월 1일부터 현재까지의 재고 데이터를 이용하여 SKU별 파레트 평균 적재량을 업데이트하고 DB/캐시에 저장합니다"
+          style={{ border: '1px solid #3b82f6', color: '#60a5fa', display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          <RefreshCw size={16} className={isUpdatingSku ? 'spin' : ''} />
+          {isUpdatingSku ? 'SKU계산중...' : 'SKU업데이트'}
+        </button>
+
+        <button 
+          className="btn-secondary" 
+          onClick={onDownloadSkuPalletExcel}
+          title="계산된 SKU별 파레트 평균 적재량 데이터 엑셀 파일 다운로드"
+          style={{ border: '1px solid #10b981', color: '#34d399', display: 'flex', alignItems: 'center', gap: '6px' }}
+        >
+          <FileSpreadsheet size={16} />
+          SKU다운로드
+        </button>
 
         {/* ── 구분선 ── */}
         <div style={{ width: '1px', height: '28px', background: 'rgba(255,255,255,0.15)', margin: '0 4px' }} />
