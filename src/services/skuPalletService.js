@@ -1,5 +1,5 @@
 import * as XLSX from 'xlsx';
-import { supabase, isSupabaseConfigured } from './accessLogger';
+import { supabase, isSupabaseConfigured } from './dataProcessor';
 
 const SKU_CACHE_KEY = 'SKU_AVG_PALLET_QTY_CACHE';
 
