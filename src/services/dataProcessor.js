@@ -628,6 +628,9 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
       targetPlans = planRows || [];
     }
 
+    // SKU별 파레트당 평균 적재 수량 Map (재고현황 데이터 기준)
+    const avgQtyMap = buildAvgQtyPerPalletMap(inventoryRows);
+
     const planItemSet = new Set();
     const planItemQtyMap = new Map();
     let planTotalQtySum = 0;
@@ -638,20 +641,24 @@ export function processRawDatasets({ rackRows, planRows, missionRows, inventoryR
 
     targetPlans.forEach(pl => {
       const item = pl.ItemId || pl.SKU || pl.ItemCode || pl.Items;
-      const qty = Number(pl.TargetPalletQuantity) || Number(pl.Quantity) || Number(pl.TargetQty) || 1;
+      const palletCount = Number(pl.TargetPalletQuantity) || Number(pl.Quantity) || Number(pl.TargetQty) || 1;
       const loc = pl.LocationId || pl.ToLocation || pl.FromLocation || '';
       
       if (item) {
         const itemStr = String(item).trim();
+        // SKU별 파레트당 평균 적재 수량 환산 (재고 데이터 기준)
+        const avgPerPallet = avgQtyMap.get(itemStr) || 35; // 기본값 35 EA/Pallet
+        const convertedQty = palletCount * avgPerPallet;
+
         planItemSet.add(itemStr);
-        planItemQtyMap.set(itemStr, (planItemQtyMap.get(itemStr) || 0) + qty);
-        planTotalQtySum += qty;
+        planItemQtyMap.set(itemStr, (planItemQtyMap.get(itemStr) || 0) + convertedQty);
+        planTotalQtySum += convertedQty;
 
         const isYardLoc = loc ? (yardSet ? yardSet.has(loc) : false) : true;
         if (isYardLoc) {
           yardPlanItemSet.add(itemStr);
-          yardPlanItemQtyMap.set(itemStr, (yardPlanItemQtyMap.get(itemStr) || 0) + qty);
-          yardPlanTotalQtySum += qty;
+          yardPlanItemQtyMap.set(itemStr, (yardPlanItemQtyMap.get(itemStr) || 0) + convertedQty);
+          yardPlanTotalQtySum += convertedQty;
         }
       }
     });
