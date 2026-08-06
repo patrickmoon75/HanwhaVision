@@ -480,60 +480,60 @@ export default function RootCauseIsolationView({ selectedDate, dateInfo }) {
             );
           })()}
 
-          {/* ── 배치계획 적중율 섹션 (신설) ── */}
-          <div style={{ marginTop: '10px', borderTop: '1px solid rgba(255, 255, 255, 0.08)', paddingTop: '10px' }}>
-            <div style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--accent-cyan)', marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-              <BarChart2 size={15} color="var(--accent-cyan)" />
-              <span>배치계획 적중율</span>
+          {/* ── 배치계획 적중율 섹션 (공간 활용 & 가독성 대폭 향상) ── */}
+          <div style={{ marginTop: '16px', borderTop: '1px solid rgba(255, 255, 255, 0.1)', paddingTop: '16px' }}>
+            <div style={{ fontSize: '1.05rem', fontWeight: 700, color: 'var(--accent-cyan)', marginBottom: '12px', display: 'flex', alignItems: 'center', gap: '8px' }}>
+              <BarChart2 size={18} color="var(--accent-cyan)" />
+              <span>배치계획 적중율 분석</span>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px' }}>
+            <div style={{ display: 'flex', gap: '14px' }}>
               {/* 1) 전체 관점 */}
-              <div style={{ flex: 1, background: 'rgba(255, 255, 255, 0.02)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(255, 255, 255, 0.06)' }}>
-                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: '#94a3b8', borderBottom: '1px solid rgba(255,255,255,0.06)', paddingBottom: '3px', marginBottom: '6px' }}>
+              <div style={{ flex: 1, background: 'rgba(255, 255, 255, 0.03)', padding: '16px 18px', borderRadius: '10px', border: '1px solid rgba(255, 255, 255, 0.08)' }}>
+                <div style={{ fontSize: '0.95rem', fontWeight: 700, color: '#e2e8f0', borderBottom: '1px solid rgba(255,255,255,0.08)', paddingBottom: '8px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   🌐 전체 관점
                 </div>
-                <div style={{ marginBottom: '6px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                    <span>품목적중율</span>
-                    <strong style={{ color: '#00f2fe', fontSize: '0.85rem' }}>{dateInfo.itemAccuracy ?? 0}%</strong>
+                <div style={{ marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.92rem', color: '#cbd5e1', fontWeight: 600, marginBottom: '2px' }}>
+                    <span>품목 적중율</span>
+                    <strong style={{ color: '#00f2fe', fontSize: '1.45rem', fontWeight: 800 }}>{dateInfo.itemAccuracy ?? 0}%</strong>
                   </div>
-                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                    배치계획 {dateInfo.planItemCount ?? 0} / 피킹 {dateInfo.pickItemCount ?? 0} SKU
+                  <span style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+                    배치계획 <strong style={{ color: '#f1f5f9' }}>{(dateInfo.planItemCount ?? 0).toLocaleString()}</strong> / 피킹 <strong style={{ color: '#f1f5f9' }}>{(dateInfo.pickItemCount ?? 0).toLocaleString()}</strong> SKU
                   </span>
                 </div>
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                    <span>수량적중율</span>
-                    <strong style={{ color: '#4ade80', fontSize: '0.85rem' }}>{dateInfo.qtyAccuracy ?? 0}%</strong>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.92rem', color: '#cbd5e1', fontWeight: 600, marginBottom: '2px' }}>
+                    <span>수량 적중율</span>
+                    <strong style={{ color: '#4ade80', fontSize: '1.45rem', fontWeight: 800 }}>{dateInfo.qtyAccuracy ?? 0}%</strong>
                   </div>
-                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                    배치계획 {(dateInfo.planTotalQtySum ?? 0).toLocaleString()} / 피킹 {(dateInfo.pickTotalQtySum ?? 0).toLocaleString()}개
+                  <span style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+                    배치계획 <strong style={{ color: '#f1f5f9' }}>{(dateInfo.planTotalQtySum ?? 0).toLocaleString()}</strong> / 피킹 <strong style={{ color: '#f1f5f9' }}>{(dateInfo.pickTotalQtySum ?? 0).toLocaleString()}</strong>개
                   </span>
                 </div>
               </div>
 
               {/* 2) 야드 관점 (805셀 모수) */}
-              <div style={{ flex: 1, background: 'rgba(0, 242, 254, 0.02)', padding: '10px', borderRadius: '8px', border: '1px solid rgba(0, 242, 254, 0.12)' }}>
-                <div style={{ fontSize: '0.74rem', fontWeight: 700, color: 'var(--accent-cyan)', borderBottom: '1px solid rgba(0, 242, 254, 0.15)', paddingBottom: '3px', marginBottom: '6px' }}>
+              <div style={{ flex: 1, background: 'rgba(0, 242, 254, 0.03)', padding: '16px 18px', borderRadius: '10px', border: '1px solid rgba(0, 242, 254, 0.15)' }}>
+                <div style={{ fontSize: '0.95rem', fontWeight: 700, color: 'var(--accent-cyan)', borderBottom: '1px solid rgba(0, 242, 254, 0.18)', paddingBottom: '8px', marginBottom: '14px', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   🎯 야드 관점 (805셀 모수)
                 </div>
-                <div style={{ marginBottom: '6px' }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                    <span>야드 품목적중율</span>
-                    <strong style={{ color: '#00f2fe', fontSize: '0.85rem' }}>{dateInfo.yardItemAccuracy ?? 0}%</strong>
+                <div style={{ marginBottom: '14px' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.92rem', color: '#cbd5e1', fontWeight: 600, marginBottom: '2px' }}>
+                    <span>야드 품목 적중율</span>
+                    <strong style={{ color: '#00f2fe', fontSize: '1.45rem', fontWeight: 800 }}>{dateInfo.yardItemAccuracy ?? 0}%</strong>
                   </div>
-                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                    야드계획 {dateInfo.yardPlanItemCount ?? 0} / 피킹 {dateInfo.pickItemCount ?? 0} SKU
+                  <span style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+                    야드계획 <strong style={{ color: '#f1f5f9' }}>{(dateInfo.yardPlanItemCount ?? 0).toLocaleString()}</strong> / 피킹 <strong style={{ color: '#f1f5f9' }}>{(dateInfo.pickItemCount ?? 0).toLocaleString()}</strong> SKU
                   </span>
                 </div>
                 <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.72rem', color: 'var(--text-secondary)' }}>
-                    <span>야드 수량적중율</span>
-                    <strong style={{ color: '#4ade80', fontSize: '0.85rem' }}>{dateInfo.yardQtyAccuracy ?? 0}%</strong>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: '0.92rem', color: '#cbd5e1', fontWeight: 600, marginBottom: '2px' }}>
+                    <span>야드 수량 적중율</span>
+                    <strong style={{ color: '#4ade80', fontSize: '1.45rem', fontWeight: 800 }}>{dateInfo.yardQtyAccuracy ?? 0}%</strong>
                   </div>
-                  <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
-                    야드계획 {(dateInfo.yardPlanTotalQtySum ?? 0).toLocaleString()} / 피킹 {(dateInfo.pickTotalQtySum ?? 0).toLocaleString()}개
+                  <span style={{ fontSize: '0.82rem', color: '#94a3b8' }}>
+                    야드계획 <strong style={{ color: '#f1f5f9' }}>{(dateInfo.yardPlanTotalQtySum ?? 0).toLocaleString()}</strong> / 피킹 <strong style={{ color: '#f1f5f9' }}>{(dateInfo.pickTotalQtySum ?? 0).toLocaleString()}</strong>개
                   </span>
                 </div>
               </div>
